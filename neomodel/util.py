@@ -1,4 +1,5 @@
 import warnings
+from enum import Enum
 from types import FrameType
 from typing import Any, Callable, Optional
 
@@ -77,3 +78,8 @@ def version_tag_to_integer(version_tag: str) -> int:
             component = component.split("-")[0]
         num += (100 ** ((len(components) - 1) - index)) * int(component)
     return num
+
+
+class DatabaseFlavour(Enum):
+    NEO4J = 1
+    MEMGRAPH = 2

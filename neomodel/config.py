@@ -1,6 +1,7 @@
 import neo4j
 
 from neomodel._version import __version__
+from neomodel.util import DatabaseFlavour
 
 # Use this to connect with automatically created driver
 # The following options are the default ones that will be used as driver config
@@ -25,3 +26,5 @@ USER_AGENT = f"neomodel/v{__version__}"
 DRIVER = None
 # Use this to connect to a specific database when using the self-managed driver
 DATABASE_NAME = None
+
+DATABASE_FLAVOUR = DatabaseFlavour.MEMGRAPH

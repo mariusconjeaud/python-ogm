@@ -32,17 +32,17 @@ def setup_neo4j_session(request):
             "Please note: The database seems to be populated.\n\tEither delete all nodes and edges manually, or set the --resetdb parameter when calling pytest\n\n\tpytest --resetdb."
         )
 
-    db.clear_neo4j_database(clear_constraints=True, clear_indexes=True)
+    # await adb.clear_neo4j_database(clear_constraints=True, clear_indexes=True)
 
-    db.install_all_labels()
+    # await adb.install_all_labels()
 
-    db.cypher_query(
-        "CREATE OR REPLACE USER troygreene SET PASSWORD 'foobarbaz' CHANGE NOT REQUIRED"
-    )
-    db_edition = db.database_edition
-    if db_edition == "enterprise":
-        db.cypher_query("GRANT ROLE publisher TO troygreene")
-        db.cypher_query("GRANT IMPERSONATE (troygreene) ON DBMS TO admin")
+    # await adb.cypher_query(
+    #     "CREATE OR REPLACE USER troygreene SET PASSWORD 'foobarbaz' CHANGE NOT REQUIRED"
+    # )
+    # db_edition = await adb.database_edition
+    # if db_edition == "enterprise":
+    #     await adb.cypher_query("GRANT ROLE publisher TO troygreene")
+    #     await adb.cypher_query("GRANT IMPERSONATE (troygreene) ON DBMS TO admin")
 
     yield
 

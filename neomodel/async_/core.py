@@ -38,6 +38,7 @@ from neomodel.exceptions import (
 from neomodel.hooks import hooks
 from neomodel.properties import FulltextIndex, Property, VectorIndex
 from neomodel.util import (
+    DatabaseFlavour,
     _UnsavedNode,
     classproperty,
     deprecated,
@@ -576,7 +577,9 @@ class AsyncDatabase(local):
                 This might mean that the database server is offline.
                 """
             )
-        if db_version.startswith("4"):
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+            return "id"
+        elif db_version.startswith("4"):
             return "id"
         else:
             return "elementId"
@@ -594,7 +597,14 @@ class AsyncDatabase(local):
                 This might mean that the database server is offline.
                 """
             )
-        return int(element_id) if db_version.startswith("4") else element_id
+        return (
+            int(element_id)
+            if (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+                or db_version.startswith("4")
+            )
+            else element_id
+        )
 
     async def list_indexes(self, exclude_token_lookup: bool = False) -> list[dict]:
         """Returns all indexes existing in the database
@@ -605,7 +615,13 @@ class AsyncDatabase(local):
         Returns:
             Sequence[dict]: List of dictionaries, each entry being an index definition
         """
-        indexes, meta_indexes = await self.cypher_query("SHOW INDEXES")
+        query = (
+            "SHOW INDEX INFO"
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            else "SHOW INDEXES"
+        )
+        indexes, meta_indexes = await self.cypher_query(query)
+
         indexes_as_dict = [dict(zip(meta_indexes, row)) for row in indexes]
 
         if exclude_token_lookup:
@@ -621,7 +637,12 @@ class AsyncDatabase(local):
         Returns:
             Sequence[dict]: List of dictionaries, each entry being a constraint definition
         """
-        constraints, meta_constraints = await self.cypher_query("SHOW CONSTRAINTS")
+        query = (
+            "SHOW CONSTRAINT INFO"
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            else "SHOW CONSTRAINTS"
+        )
+        constraints, meta_constraints = await self.cypher_query(query)
         constraints_as_dict = [dict(zip(meta_constraints, row)) for row in constraints]
 
         return constraints_as_dict
@@ -681,13 +702,19 @@ class AsyncDatabase(local):
     async def clear_neo4j_database(
         self, clear_constraints: bool = False, clear_indexes: bool = False
     ) -> None:
-        await self.cypher_query(
+        query = (
             """
+            USING PERIODIC COMMIT 5000
+            MATCH (a) DETACH DELETE a
+        """
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            else """
             MATCH (a)
             CALL { WITH a DETACH DELETE a }
             IN TRANSACTIONS OF 5000 rows
         """
         )
+        await self.cypher_query(query)
         if clear_constraints:
             await drop_constraints()
         if clear_indexes:
@@ -705,10 +732,10 @@ class AsyncDatabase(local):
         if not stdout or stdout is None:
             stdout = sys.stdout
 
-        results, meta = await self.cypher_query("SHOW CONSTRAINTS")
-
-        results_as_dict = [dict(zip(meta, row)) for row in results]
+        results_as_dict = await self.list_constraints()
         for constraint in results_as_dict:
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                break
             await self.cypher_query("DROP CONSTRAINT " + constraint["name"])
             if not quiet:
                 stdout.write(
@@ -735,6 +762,8 @@ class AsyncDatabase(local):
 
         indexes = await self.list_indexes(exclude_token_lookup=True)
         for index in indexes:
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                break
             await self.cypher_query("DROP INDEX " + index["name"])
             if not quiet:
                 stdout.write(
@@ -814,11 +843,15 @@ class AsyncDatabase(local):
             return
 
         for name, property in cls.defined_properties(aliases=False, rels=False).items():
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                break
             await self._install_node(cls, name, property, quiet, _stdout)
 
         for _, relationship in cls.defined_properties(
             aliases=False, rels=True, properties=False
         ).items():
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                break
             await self._install_relationship(cls, relationship, quiet, _stdout)
 
     async def _create_node_index(
