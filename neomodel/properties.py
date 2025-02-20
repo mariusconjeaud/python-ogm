@@ -70,15 +70,21 @@ class VectorIndex:
         self,
         dimensions: Optional[int] = 1536,
         similarity_function: Optional[str] = "cosine",
+        capacity: Optional[int] = 1000,
+        resize_coefficient: Optional[int] = 2,
     ):
         """
         Initializes new vector index definition with dimensions and similarity
 
         :param int dimensions: The number of dimensions of the vector. Defaults to 1536.
-        :param str similarity_function: The similarity algorithm to use. Defaults to "cosine".
+        :param str similarity_function: The similarity algorithm to use. Defaults to "cosine". Matches to "metric" config in Memgraph.
+        :param int capacity: For Memgraph. The maximum number of vectors in the index. Defaults to 1000.
+        :param int resize_coefficient: For Memgraph. The resize coefficient for the index. Defaults to 2.
         """
         self.dimensions = dimensions
         self.similarity_function = similarity_function
+        self.capacity = capacity
+        self.resize_coefficient = resize_coefficient
 
 
 class Property(metaclass=ABCMeta):

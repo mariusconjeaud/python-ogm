@@ -93,7 +93,8 @@ def test_cardinality_zero_or_one():
     # AttemptedCardinalityViolation
     db.cypher_query(
         """
-        MATCH (m:Monkey WHERE m.name="bob")
+        MATCH (m:Monkey)
+        WHERE m.name="bob"
         CREATE (s:ScrewDriver {version:3})
         WITH m, s
         CREATE (m)-[:HAS_SCREWDRIVER]->(s)
@@ -167,7 +168,8 @@ def test_cardinality_one():
     # AttemptedCardinalityViolation
     db.cypher_query(
         """
-        MATCH (m:Monkey WHERE m.name="jerry")
+        MATCH (m:Monkey)
+        WHERE m.name="jerry"
         CREATE (t:ToothBrush {name:"Jim"})
         WITH m, t
         CREATE (m)-[:HAS_TOOTHBRUSH]->(t)

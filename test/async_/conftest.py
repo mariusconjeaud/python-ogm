@@ -6,6 +6,7 @@ from test._async_compat import (
 )
 
 from neomodel import adb, config
+from neomodel.util import DatabaseFlavour
 
 
 @mark_async_session_auto_fixture
@@ -32,13 +33,18 @@ async def setup_neo4j_session(request):
             "Please note: The database seems to be populated.\n\tEither delete all nodes and edges manually, or set the --resetdb parameter when calling pytest\n\n\tpytest --resetdb."
         )
 
-    # await adb.clear_neo4j_database(clear_constraints=True, clear_indexes=True)
+    await adb.clear_neo4j_database(clear_constraints=True, clear_indexes=True)
 
-    # await adb.install_all_labels()
+    await adb.install_all_labels()
 
-    # await adb.cypher_query(
-    #     "CREATE OR REPLACE USER troygreene SET PASSWORD 'foobarbaz' CHANGE NOT REQUIRED"
-    # )
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        await adb.cypher_query(
+            "CREATE OR REPLACE USER troygreene SET PASSWORD 'foobarbaz' CHANGE NOT REQUIRED"
+        )
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        await adb.cypher_query(
+            "CREATE USER IF NOT EXISTS troygreene IDENTIFIED BY 'foobarbaz'"
+        )
     # db_edition = await adb.database_edition
     # if db_edition == "enterprise":
     #     await adb.cypher_query("GRANT ROLE publisher TO troygreene")

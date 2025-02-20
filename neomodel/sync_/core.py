@@ -531,9 +531,18 @@ class Database(local):
                 results = self._result_resolution(results)
 
         except ClientError as e:
-            if e.code == "Neo.ClientError.Schema.ConstraintValidationFailed":
+            if (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+                and e.code == "Neo.ClientError.Schema.ConstraintValidationFailed"
+            ) or (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+                and "constraint violation" in e.message.lower()
+            ):
                 if hasattr(e, "message") and e.message is not None:
-                    if "already exists with label" in e.message and handle_unique:
+                    if (
+                        "already exists with label" in e.message
+                        or "unique constraint" in e.message
+                    ) and handle_unique:
                         raise UniqueProperty(e.message) from e
                     raise ConstraintValidationFailed(e.message) from e
                 raise ConstraintValidationFailed(
@@ -624,7 +633,7 @@ class Database(local):
 
         indexes_as_dict = [dict(zip(meta_indexes, row)) for row in indexes]
 
-        if exclude_token_lookup:
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J and exclude_token_lookup:
             indexes_as_dict = [
                 obj for obj in indexes_as_dict if obj["type"] != "LOOKUP"
             ]
@@ -691,10 +700,19 @@ class Database(local):
         Returns:
             bool: True if the database supports parallel runtime
         """
-        return self.version_is_higher_than("5.13") and self.edition_is_enterprise()
+        return (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and self.version_is_higher_than("5.13")
+            and self.edition_is_enterprise()
+        )
 
     def change_neo4j_password(self, user: str, new_password: str) -> None:
-        self.cypher_query(f"ALTER USER {user} SET PASSWORD '{new_password}'")
+        query = (
+            f"SET PASSWORD FOR {user} TO '{new_password}'"
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            else f"ALTER USER {user} SET PASSWORD '{new_password}'"
+        )
+        self.cypher_query(query)
 
     def clear_neo4j_database(
         self, clear_constraints: bool = False, clear_indexes: bool = False
@@ -731,9 +749,15 @@ class Database(local):
 
         results_as_dict = self.list_constraints()
         for constraint in results_as_dict:
+            query = ""
             if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
-                break
-            self.cypher_query("DROP CONSTRAINT " + constraint["name"])
+                if constraint["constraint type"] == "exists":
+                    query = f"DROP CONSTRAINT ON (n:{constraint['label']}) ASSERT EXISTS (n.{constraint['properties'][0]})"
+                elif constraint["constraint type"] == "unique":
+                    query = f"DROP CONSTRAINT ON (n:{constraint['label']}) ASSERT n.{constraint['properties'][0]} IS UNIQUE"
+            elif config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+                query = "DROP CONSTRAINT " + constraint["name"]
+            self.cypher_query(query)
             if not quiet:
                 stdout.write(
                     (
@@ -757,9 +781,16 @@ class Database(local):
 
         indexes = self.list_indexes(exclude_token_lookup=True)
         for index in indexes:
+            query = ""
             if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
-                break
-            self.cypher_query("DROP INDEX " + index["name"])
+                query = f"DROP INDEX ON :{index['label']}"
+                if index["index type"] == "label+property":
+                    query += f"({index['property']})"
+                elif index["index type"] == "edge-type+property":
+                    query = f"DROP EDGE INDEX ON :{index['label']}({index['property']})"
+            elif config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+                query = "DROP INDEX " + index["name"]
+            self.cypher_query(query)
             if not quiet:
                 stdout.write(
                     f' - Dropping index on labels {",".join(index["labelsOrTypes"])} with properties {",".join(index["properties"])}.\n'
@@ -838,15 +869,11 @@ class Database(local):
             return
 
         for name, property in cls.defined_properties(aliases=False, rels=False).items():
-            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
-                break
             self._install_node(cls, name, property, quiet, _stdout)
 
         for _, relationship in cls.defined_properties(
             aliases=False, rels=True, properties=False
         ).items():
-            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
-                break
             self._install_relationship(cls, relationship, quiet, _stdout)
 
     def _create_node_index(
@@ -859,9 +886,12 @@ class Database(local):
                 f" + Creating node index for {property_name} on label {label} for class {target_cls.__module__}.{target_cls.__name__}\n"
             )
         try:
-            self.cypher_query(
+            query = (
                 f"CREATE INDEX {index_name} FOR (n:{label}) ON (n.{property_name}); "
             )
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                query = f"CREATE INDEX ON :{label}({property_name})"
+            self.cypher_query(query)
         except ClientError as e:
             if e.code in (
                 RULE_ALREADY_EXISTS,
@@ -879,7 +909,10 @@ class Database(local):
         fulltext_index: FulltextIndex,
         quiet: bool,
     ) -> None:
-        if self.version_is_higher_than("5.16"):
+        if (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and self.version_is_higher_than("5.16")
+        ):
             label = target_cls.__label__
             index_name = f"fulltext_index_{label}_{property_name}"
             if not quiet:
@@ -907,7 +940,7 @@ class Database(local):
                     raise
         else:
             raise FeatureNotSupported(
-                f"Creation of full-text indexes from neomodel is not supported for Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.16 or higher."
+                f"Creation of full-text indexes from neomodel is not supported for Memgraph, or Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.16 or higher."
             )
 
     def _create_node_vector_index(
@@ -918,8 +951,11 @@ class Database(local):
         vector_index: VectorIndex,
         quiet: bool,
     ) -> None:
-        if self.version_is_higher_than("5.15"):
-            label = target_cls.__label__
+        label = target_cls.__label__
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH or (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and self.version_is_higher_than("5.15")
+        ):
             index_name = f"vector_index_{label}_{property_name}"
             if not quiet:
                 stdout.write(
@@ -934,6 +970,17 @@ class Database(local):
                     }}
                 }};
             """
+
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                query = f"""
+                    CREATE VECTOR INDEX {index_name} ON :{label}({property_name})
+                    WITH CONFIG {{
+                        `dimension`: {vector_index.dimensions},
+                        `capacity`: {vector_index.capacity},
+                        `metric`: '{vector_index.similarity_function}',
+                        `resize_coefficient`: {vector_index.resize_coefficient},
+                    }}
+                """
             try:
                 self.cypher_query(query)
             except ClientError as e:
@@ -946,7 +993,7 @@ class Database(local):
                     raise
         else:
             raise FeatureNotSupported(
-                f"Creation of vector indexes from neomodel is not supported for Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.15 or higher."
+                f"Creation of vector indexes from neomodel is not supported for your database flavour in version {self.database_version}. Please upgrade to Neo4j 5.15 or higher."
             )
 
     def _create_node_constraint(
@@ -959,10 +1006,11 @@ class Database(local):
                 f" + Creating node unique constraint for {property_name} on label {target_cls.__label__} for class {target_cls.__module__}.{target_cls.__name__}\n"
             )
         try:
-            self.cypher_query(
-                f"""CREATE CONSTRAINT {constraint_name}
+            query = f"""CREATE CONSTRAINT {constraint_name}
                             FOR (n:{label}) REQUIRE n.{property_name} IS UNIQUE"""
-            )
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                query = f"CREATE CONSTRAINT ON (n:{label}) ASSERT n.{property_name} IS UNIQUE"
+            self.cypher_query(query)
         except ClientError as e:
             if e.code in (
                 RULE_ALREADY_EXISTS,
@@ -987,9 +1035,10 @@ class Database(local):
                 f" + Creating relationship index for {property_name} on relationship type {relationship_type} for relationship model {target_cls.__module__}.{relationship_cls.__name__}\n"
             )
         try:
-            self.cypher_query(
-                f"CREATE INDEX {index_name} FOR ()-[r:{relationship_type}]-() ON (r.{property_name}); "
-            )
+            query = f"CREATE INDEX {index_name} FOR ()-[r:{relationship_type}]-() ON (r.{property_name}); "
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                query = f"CREATE EDGE INDEX ON :{relationship_type}({property_name})"
+            self.cypher_query(query)
         except ClientError as e:
             if e.code in (
                 RULE_ALREADY_EXISTS,
@@ -1009,7 +1058,10 @@ class Database(local):
         fulltext_index: FulltextIndex,
         quiet: bool,
     ) -> None:
-        if self.version_is_higher_than("5.16"):
+        if (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and self.version_is_higher_than("5.16")
+        ):
             index_name = f"fulltext_index_{relationship_type}_{property_name}"
             if not quiet:
                 stdout.write(
@@ -1036,7 +1088,7 @@ class Database(local):
                     raise
         else:
             raise FeatureNotSupported(
-                f"Creation of full-text indexes from neomodel is not supported for Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.16 or higher."
+                f"Creation of full-text indexes from neomodel is not supported for Memgraph, or Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.16 or higher."
             )
 
     def _create_relationship_vector_index(
@@ -1049,7 +1101,10 @@ class Database(local):
         vector_index: VectorIndex,
         quiet: bool,
     ) -> None:
-        if self.version_is_higher_than("5.18"):
+        if (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and self.version_is_higher_than("5.18")
+        ):
             index_name = f"vector_index_{relationship_type}_{property_name}"
             if not quiet:
                 stdout.write(
@@ -1076,7 +1131,7 @@ class Database(local):
                     raise
         else:
             raise FeatureNotSupported(
-                f"Creation of vector indexes for relationships from neomodel is not supported for Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.18 or higher."
+                f"Creation of vector indexes for relationships from neomodel is not supported for Memgraph, or Neo4j in version {self.database_version}. Please upgrade to Neo4j 5.18 or higher."
             )
 
     def _create_relationship_constraint(
@@ -1088,7 +1143,10 @@ class Database(local):
         stdout: TextIO,
         quiet: bool,
     ) -> None:
-        if self.version_is_higher_than("5.7"):
+        if (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and self.version_is_higher_than("5.7")
+        ):
             constraint_name = f"constraint_unique_{relationship_type}_{property_name}"
             if not quiet:
                 stdout.write(
@@ -1109,7 +1167,7 @@ class Database(local):
                     raise
         else:
             raise FeatureNotSupported(
-                f"Unique indexes on relationships are not supported in Neo4j version {self.database_version}. Please upgrade to Neo4j 5.7 or higher."
+                f"Unique indexes on relationships are not supported in Memgraph, or Neo4j version {self.database_version}. Please upgrade to Neo4j 5.7 or higher."
             )
 
     def _install_node(

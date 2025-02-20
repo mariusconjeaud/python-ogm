@@ -1,7 +1,7 @@
 from test._async_compat import mark_sync_test
 
 import pytest
-from neo4j.exceptions import AuthError
+from neo4j.exceptions import AuthError, ClientError
 
 from neomodel import (
     IntegerProperty,
@@ -9,8 +9,10 @@ from neomodel import (
     StringProperty,
     StructuredNode,
     StructuredRel,
+    config,
     db,
 )
+from neomodel.util import DatabaseFlavour
 
 
 class City(StructuredNode):
@@ -69,8 +71,12 @@ def test_change_password():
     db.set_connection(url=new_url)
     db.close_connection()
 
-    with pytest.raises(AuthError):
-        db.set_connection(url=prev_url)
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        with pytest.raises(AuthError):
+            db.set_connection(url=prev_url)
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        with pytest.raises(ClientError, match="Authentication failure"):
+            db.set_connection(url=prev_url)
 
     db.close_connection()
 
