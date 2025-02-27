@@ -762,8 +762,8 @@ class AsyncDatabase(local):
                 stdout.write(
                     (
                         " - Dropping unique constraint and index"
-                        f" on label {constraint['labelsOrTypes'][0]}"
-                        f" with property {constraint['properties'][0]}.\n"
+                        f" on label {constraint['labelsOrTypes'][0] if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else constraint['label']}"
+                        f" with property {constraint['properties'][0] if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else constraint['properties'][0]}.\n"
                     )
                 )
         if not quiet:
@@ -795,7 +795,11 @@ class AsyncDatabase(local):
             await self.cypher_query(query)
             if not quiet:
                 stdout.write(
-                    f' - Dropping index on labels {",".join(index["labelsOrTypes"])} with properties {",".join(index["properties"])}.\n'
+                    (
+                        " - Dropping index on labels "
+                        f"{",".join(index["labelsOrTypes"]) if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else ",".join(index["label"])} "
+                        f"with properties {",".join(index["properties"]) if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else ",".join(index["property"])}.\n"
+                    )
                 )
         if not quiet:
             stdout.write("\n")

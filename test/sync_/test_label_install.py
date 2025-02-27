@@ -15,9 +15,11 @@ from neomodel import (
     StructuredRel,
     UniqueIdProperty,
     VectorIndex,
+    config,
     db,
 )
 from neomodel.exceptions import ConstraintValidationFailed, FeatureNotSupported
+from neomodel.util import DatabaseFlavour
 
 
 class NodeWithIndex(StructuredNode):
@@ -59,11 +61,26 @@ def test_install_all():
     db.install_all_labels()
 
     indexes = db.list_indexes()
-    index_names = [index["name"] for index in indexes]
+
+    index_names = []
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        index_names = [index["name"] for index in indexes]
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        index_names = [
+            f"index_{index['label']}_{index['property']}" for index in indexes
+        ]
+
     assert "index_INDEXED_REL_indexed_rel_prop" in index_names
 
     constraints = db.list_constraints()
-    constraint_names = [constraint["name"] for constraint in constraints]
+    constraint_names = []
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        constraint_names = [constraint["name"] for constraint in constraints]
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        constraint_names = [
+            f"constraint_{constraint['constraint type']}_{constraint['label']}_{constraint['properties'][0]}"
+            for constraint in constraints
+        ]
     assert "constraint_unique_NodeWithConstraint_name" in constraint_names
     assert "constraint_unique_SomeNotUniqueNode_id" in constraint_names
 
