@@ -6,6 +6,7 @@ from typing import Any, AsyncIterator
 from typing import Optional as TOptional
 from typing import Tuple, Union
 
+from neomodel import config
 from neomodel.async_ import relationship_manager
 from neomodel.async_.core import AsyncStructuredNode, adb
 from neomodel.async_.relationship import AsyncStructuredRel
@@ -13,7 +14,7 @@ from neomodel.exceptions import MultipleNodesReturned
 from neomodel.match_q import Q, QBase
 from neomodel.properties import AliasProperty, ArrayProperty, Property
 from neomodel.typing import Subquery, Transformation
-from neomodel.util import INCOMING, OUTGOING
+from neomodel.util import INCOMING, OUTGOING, DatabaseFlavour
 
 CYPHER_ACTIONS_WITH_SIDE_EFFECT_EXPR = re.compile(r"(?i:MERGE|CREATE|DELETE|DETACH)")
 
@@ -164,24 +165,45 @@ _SPECIAL_OPERATOR_REGEX = "=~"
 
 _UNARY_OPERATORS = (_SPECIAL_OPERATOR_ISNULL, _SPECIAL_OPERATOR_ISNOTNULL)
 
-_REGEX_INSESITIVE = _SPECIAL_OPERATOR_INSENSITIVE + "{}"
+_REGEX_SENSITIVE = "{}"
+_REGEX_INSENSITIVE = _SPECIAL_OPERATOR_INSENSITIVE + "{}"
 _REGEX_CONTAINS = ".*{}.*"
 _REGEX_STARTSWITH = "{}.*"
 _REGEX_ENDSWITH = ".*{}"
 
 # regex operations that require escaping
 _STRING_REGEX_OPERATOR_TABLE = {
-    "iexact": _REGEX_INSESITIVE,
+    "iexact": (
+        _REGEX_INSENSITIVE
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        else _REGEX_SENSITIVE
+    ),
     "contains": _REGEX_CONTAINS,
-    "icontains": _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_CONTAINS,
+    "icontains": (
+        _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_CONTAINS
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        else _REGEX_CONTAINS
+    ),
     "startswith": _REGEX_STARTSWITH,
-    "istartswith": _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_STARTSWITH,
+    "istartswith": (
+        _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_STARTSWITH
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        else _REGEX_STARTSWITH
+    ),
     "endswith": _REGEX_ENDSWITH,
-    "iendswith": _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_ENDSWITH,
+    "iendswith": (
+        _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_ENDSWITH
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        else _REGEX_ENDSWITH
+    ),
 }
 # regex operations that do not require escaping
 _REGEX_OPERATOR_TABLE = {
-    "iregex": _REGEX_INSESITIVE,
+    "iregex": (
+        _REGEX_INSENSITIVE
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        else _REGEX_SENSITIVE
+    ),
 }
 # list all regex operations, these will require formatting of the value
 _REGEX_OPERATOR_TABLE.update(_STRING_REGEX_OPERATOR_TABLE)
@@ -693,7 +715,7 @@ class AsyncQueryBuilder:
         for _, value in node_set.must_match.items():
             if isinstance(value, dict):
                 label = ":" + value["node_class"].__label__
-                stmt = _rel_helper(lhs=source_ident, rhs=label, ident="", **value)
+                stmt = f"EXISTS ({_rel_helper(lhs=source_ident, rhs=label, ident='', **value)})"
                 self._ast.where.append(stmt)
             else:
                 raise ValueError("Expecting dict got: " + repr(value))
@@ -701,8 +723,8 @@ class AsyncQueryBuilder:
         for _, val in node_set.dont_match.items():
             if isinstance(val, dict):
                 label = ":" + val["node_class"].__label__
-                stmt = _rel_helper(lhs=source_ident, rhs=label, ident="", **val)
-                self._ast.where.append("NOT " + stmt)
+                stmt = f"NOT EXISTS ({_rel_helper(lhs=source_ident, rhs=label, ident='', **val)})"
+                self._ast.where.append(stmt)
             else:
                 raise ValueError("Expecting dict got: " + repr(val))
 

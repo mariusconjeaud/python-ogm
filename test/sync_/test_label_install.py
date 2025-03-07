@@ -96,24 +96,32 @@ def test_install_label_twice(capsys):
         "{code: Neo.ClientError.Schema.EquivalentSchemaRuleAlreadyExists}"
     )
     db.install_labels(AbstractNode)
-    db.install_labels(AbstractNode)
 
     db.install_labels(NodeWithIndex)
-    db.install_labels(NodeWithIndex, quiet=False)
-    captured = capsys.readouterr()
-    assert expected_std_out in captured.out
-
     db.install_labels(NodeWithConstraint)
-    db.install_labels(NodeWithConstraint, quiet=False)
-    captured = capsys.readouterr()
-    assert expected_std_out in captured.out
 
     db.install_labels(OtherNodeWithRelationship)
-    db.install_labels(OtherNodeWithRelationship, quiet=False)
-    captured = capsys.readouterr()
-    assert expected_std_out in captured.out
 
-    if db.version_is_higher_than("5.7"):
+    # Neo4j will throw an error if we try to install the same label twice
+    # Others like Memgraph won't
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        db.install_labels(AbstractNode)
+
+        db.install_labels(NodeWithIndex, quiet=False)
+        captured = capsys.readouterr()
+        assert expected_std_out in captured.out
+
+        db.install_labels(NodeWithConstraint, quiet=False)
+        captured = capsys.readouterr()
+        assert expected_std_out in captured.out
+
+        db.install_labels(OtherNodeWithRelationship, quiet=False)
+        captured = capsys.readouterr()
+        assert expected_std_out in captured.out
+
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J and db.version_is_higher_than(
+        "5.7"
+    ):
 
         class UniqueIndexRelationship(StructuredRel):
             unique_index_rel_prop = StringProperty(unique_index=True)
@@ -171,6 +179,8 @@ def test_relationship_unique_index_not_supported():
 
 @mark_sync_test
 def test_relationship_unique_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.7"):
         pytest.skip("Not supported before 5.7")
 
@@ -202,6 +212,8 @@ def test_relationship_unique_index():
 
 @mark_sync_test
 def test_fulltext_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -218,6 +230,8 @@ def test_fulltext_index():
 
 @mark_sync_test
 def test_fulltext_index_conflict():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -255,6 +269,8 @@ def test_fulltext_index_not_supported():
 
 @mark_sync_test
 def test_rel_fulltext_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -276,6 +292,8 @@ def test_rel_fulltext_index():
 
 @mark_sync_test
 def test_rel_fulltext_index_conflict():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -372,6 +390,8 @@ def test_vector_index_conflict():
 
 @mark_sync_test
 def test_vector_index_not_supported():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if db.version_is_higher_than("5.15"):
         pytest.skip("Test only for versions lower than 5.15")
 
@@ -387,6 +407,8 @@ def test_vector_index_not_supported():
 
 @mark_sync_test
 def test_rel_vector_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.18"):
         pytest.skip("Not supported before 5.18")
 
@@ -411,6 +433,8 @@ def test_rel_vector_index():
 
 @mark_sync_test
 def test_rel_vector_index_conflict():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not db.version_is_higher_than("5.18"):
         pytest.skip("Not supported before 5.18")
 
@@ -462,6 +486,8 @@ def test_rel_vector_index_not_supported():
 
 @mark_sync_test
 def test_unauthorized_index_creation():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only tested for Neo4j")
     if not db.edition_is_enterprise():
         pytest.skip("Skipping test for community edition")
 
@@ -514,6 +540,8 @@ def test_unauthorized_index_creation():
 
 @mark_sync_test
 def test_unauthorized_index_creation_recent_features():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only tested for Neo4j")
     if not db.edition_is_enterprise() or not db.version_is_higher_than("5.18"):
         pytest.skip("Skipping test for community edition and versions lower than 5.18")
 
@@ -603,14 +631,35 @@ def test_unauthorized_index_creation_recent_features():
 
 
 def _drop_constraints_for_label_and_property(label: str = None, property: str = None):
-    results, meta = db.cypher_query("SHOW CONSTRAINTS")
+    query = (
+        "SHOW CONSTRAINT INFO"
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+        else "SHOW CONSTRAINTS"
+    )
+    results, meta = db.cypher_query(query)
     results_as_dict = [dict(zip(meta, row)) for row in results]
-    constraint_names = [
-        constraint
-        for constraint in results_as_dict
-        if constraint["labelsOrTypes"] == label and constraint["properties"] == property
-    ]
-    for constraint_name in constraint_names:
-        db.cypher_query(f"DROP CONSTRAINT {constraint_name}")
 
-    return constraint_names
+    dropped_constraints = []
+
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        dropped_constraints = [
+            constraint
+            for constraint in results_as_dict
+            if constraint["labelsOrTypes"] == label
+            and constraint["properties"] == property
+        ]
+        for constraint_name in dropped_constraints:
+            db.cypher_query(f"DROP CONSTRAINT {constraint_name}")
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        dropped_constraints = [
+            constraint
+            for constraint in results_as_dict
+            if constraint["label"] == label and constraint["properties"][0] == property
+        ]
+        for constraint in dropped_constraints:
+            if constraint["constraint type"] == "exists":
+                query = f"DROP CONSTRAINT ON (n:{constraint['label']}) ASSERT EXISTS (n.{constraint['properties'][0]})"
+            elif constraint["constraint type"] == "unique":
+                query = f"DROP CONSTRAINT ON (n:{constraint['label']}) ASSERT n.{constraint['properties'][0]} IS UNIQUE"
+
+    return dropped_constraints

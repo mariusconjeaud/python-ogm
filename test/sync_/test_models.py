@@ -9,9 +9,11 @@ from neomodel import (
     StringProperty,
     StructuredNode,
     StructuredRel,
+    config,
     db,
 )
 from neomodel.exceptions import RequiredProperty, UniqueProperty
+from neomodel.util import DatabaseFlavour
 
 
 class User(StructuredNode):
@@ -217,7 +219,10 @@ def test_refresh():
     assert c.age == 20
 
     _db_version = db.database_version
-    if _db_version.startswith("4"):
+    if (
+        _db_version.startswith("4")
+        or config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+    ):
         c = Customer2.inflate(999)
     else:
         c = Customer2.inflate("4:xxxxxx:999")

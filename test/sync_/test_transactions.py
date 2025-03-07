@@ -5,7 +5,8 @@ from neo4j.api import Bookmarks
 from neo4j.exceptions import ClientError, TransactionError
 from pytest import raises
 
-from neomodel import StringProperty, StructuredNode, UniqueProperty, db
+from neomodel import StringProperty, StructuredNode, UniqueProperty, config, db
+from neomodel.util import DatabaseFlavour
 
 
 class APerson(StructuredNode):
@@ -72,6 +73,8 @@ def test_query_inside_transaction():
 
 @mark_sync_test
 def test_read_transaction():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Memgraph does not support read-only transactions")
     APerson(name="Johnny").save()
 
     with db.read_transaction:
@@ -87,6 +90,8 @@ def test_read_transaction():
 
 @mark_sync_test
 def test_write_transaction():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Memgraph does not support read-only transactions")
     with db.write_transaction:
         APerson(name="Amelia").save()
 

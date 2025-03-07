@@ -19,6 +19,7 @@ from neomodel import (
     StringProperty,
     UniqueIdProperty,
     adb,
+    config,
 )
 from neomodel._async_compat.util import AsyncUtil
 from neomodel.async_.match import (
@@ -34,6 +35,7 @@ from neomodel.async_.match import (
     Size,
 )
 from neomodel.exceptions import MultipleNodesReturned, RelationshipClassNotDefined
+from neomodel.util import DatabaseFlavour
 
 
 class SupplierRel(AsyncStructuredRel):
@@ -392,18 +394,22 @@ async def test_extra_filters():
 
     coffees_5_10 = await Coffee.nodes.filter(price__in=[10, 5])
     assert len(coffees_5_10) == 2, "unexpected number of results"
-    assert c1 in coffees_5_10, "doesnt contain 5 price coffee"
-    assert c2 in coffees_5_10, "doesnt contain 10 price coffee"
+    assert c1 in coffees_5_10, "does not contain 5 price coffee"
+    assert c2 in coffees_5_10, "does not contain 10 price coffee"
 
-    finest_coffees = await Coffee.nodes.filter(name__iendswith=" Finest")
+    # Only Neo4j supports case-insensitive search
+    name_filter = (
+        " Finest" if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else " finest"
+    )
+    finest_coffees = await Coffee.nodes.filter(name__iendswith=name_filter)
     assert len(finest_coffees) == 3, "unexpected number of results"
-    assert c1 in finest_coffees, "doesnt contain 1st finest coffee"
-    assert c2 in finest_coffees, "doesnt contain 2nd finest coffee"
-    assert c3 in finest_coffees, "doesnt contain 3rd finest coffee"
+    assert c1 in finest_coffees, "does not contain 1st finest coffee"
+    assert c2 in finest_coffees, "does not contain 2nd finest coffee"
+    assert c3 in finest_coffees, "does not contain 3rd finest coffee"
 
     unpriced_coffees = await Coffee.nodes.filter(price__isnull=True)
     assert len(unpriced_coffees) == 1, "unexpected number of results"
-    assert c4 in unpriced_coffees, "doesnt contain unpriced coffee"
+    assert c4 in unpriced_coffees, "does not contain unpriced coffee"
 
     coffees_with_id_gte_3 = await Coffee.nodes.filter(id___gte=3)
     assert len(coffees_with_id_gte_3) == 2, "unexpected number of results"
@@ -468,13 +474,13 @@ async def test_empty_filters():
     assert len(await filter_empty_filter.all()) == 1, "unexpected number of results"
     assert (
         c1 in await filter_empty_filter.all()
-    ), "doesnt contain c1 in ``filter_empty_filter``"
+    ), "does not contain c1 in ``filter_empty_filter``"
 
     filter_q_empty_filter = empty_filter.filter(Q(price=5))
     assert len(await filter_empty_filter.all()) == 1, "unexpected number of results"
     assert (
         c1 in await filter_empty_filter.all()
-    ), "doesnt contain c1 in ``filter_empty_filter``"
+    ), "does not contain c1 in ``filter_empty_filter``"
 
 
 @mark_async_test
@@ -488,8 +494,8 @@ async def test_q_filters():
 
     coffees_5_10 = await Coffee.nodes.filter(Q(price=10) | Q(price=5)).all()
     assert len(coffees_5_10) == 2, "unexpected number of results"
-    assert c1 in coffees_5_10, "doesnt contain 5 price coffee"
-    assert c2 in coffees_5_10, "doesnt contain 10 price coffee"
+    assert c1 in coffees_5_10, "does not contain 5 price coffee"
+    assert c2 in coffees_5_10, "does not contain 10 price coffee"
 
     coffees_5_6 = (
         await Coffee.nodes.filter(Q(name="Latte") | Q(name="Cappuccino"))
@@ -497,8 +503,8 @@ async def test_q_filters():
         .all()
     )
     assert len(coffees_5_6) == 2, "unexpected number of results"
-    assert c5 in coffees_5_6, "doesnt contain 5 coffee"
-    assert c6 in coffees_5_6, "doesnt contain 6 coffee"
+    assert c5 in coffees_5_6, "does not contain 5 coffee"
+    assert c6 in coffees_5_6, "does not contain 6 coffee"
 
     coffees_5_6 = (
         await Coffee.nodes.filter(price=35)
@@ -506,18 +512,22 @@ async def test_q_filters():
         .all()
     )
     assert len(coffees_5_6) == 2, "unexpected number of results"
-    assert c5 in coffees_5_6, "doesnt contain 5 coffee"
-    assert c6 in coffees_5_6, "doesnt contain 6 coffee"
+    assert c5 in coffees_5_6, "does not contain 5 coffee"
+    assert c6 in coffees_5_6, "does not contain 6 coffee"
 
-    finest_coffees = await Coffee.nodes.filter(name__iendswith=" Finest").all()
+    # Only Neo4j supports case-insensitive search
+    name_filter = (
+        " Finest" if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else " finest"
+    )
+    finest_coffees = await Coffee.nodes.filter(name__iendswith=name_filter).all()
     assert len(finest_coffees) == 3, "unexpected number of results"
-    assert c1 in finest_coffees, "doesnt contain 1st finest coffee"
-    assert c2 in finest_coffees, "doesnt contain 2nd finest coffee"
-    assert c3 in finest_coffees, "doesnt contain 3rd finest coffee"
+    assert c1 in finest_coffees, "does not contain 1st finest coffee"
+    assert c2 in finest_coffees, "does not contain 2nd finest coffee"
+    assert c3 in finest_coffees, "does not contain 3rd finest coffee"
 
     unpriced_coffees = await Coffee.nodes.filter(Q(price__isnull=True)).all()
     assert len(unpriced_coffees) == 1, "unexpected number of results"
-    assert c4 in unpriced_coffees, "doesnt contain unpriced coffee"
+    assert c4 in unpriced_coffees, "does not contain unpriced coffee"
 
     coffees_with_id_gte_3 = await Coffee.nodes.filter(Q(id___gte=3)).all()
     assert len(coffees_with_id_gte_3) == 4, "unexpected number of results"

@@ -298,6 +298,22 @@ class Database(local):
 
             assert self._session is not None, "No session open"
             last_bookmarks: Bookmarks = self._session.last_bookmarks()
+        except ClientError as e:
+            # Sometimes, constraint exception can happen on transaction commit
+            # For example with Memgraph
+            if (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+                and e.code == "Neo.ClientError.Schema.ConstraintValidationFailed"
+            ) or (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+                and "constraint violation" in e.message.lower()
+            ):
+                if hasattr(e, "message") and e.message is not None:
+                    if (
+                        "already exists with label" in e.message
+                        or "unique constraint" in e.message
+                    ):
+                        raise UniqueProperty(e.message) from e
         finally:
             # In case something went wrong during
             # committing changes to the database
@@ -795,8 +811,8 @@ class Database(local):
                 stdout.write(
                     (
                         " - Dropping index on labels "
-                        f"{",".join(index["labelsOrTypes"]) if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else ",".join(index["label"])} "
-                        f"with properties {",".join(index["properties"]) if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else ",".join(index["property"])}.\n"
+                        f"{','.join(index['labelsOrTypes']) if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else ','.join(index['label'])} "
+                        f"with properties {','.join(index['properties']) if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J else ','.join(index['property'])}.\n"
                     )
                 )
         if not quiet:
@@ -1377,9 +1393,16 @@ class TransactionProxy:
         if exc_value:
             self.db.rollback()
 
-        if (
-            exc_type is ClientError
-            and exc_value.code == "Neo.ClientError.Schema.ConstraintValidationFailed"
+        if exc_type is ClientError and (
+            (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+                and exc_value.code
+                == "Neo.ClientError.Schema.ConstraintValidationFailed"
+            )
+            or (
+                config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+                and "constraint violation" in exc_value.message.lower()
+            )
         ):
             raise UniqueProperty(exc_value.message)
 

@@ -30,8 +30,7 @@ class NodeWithConstraint(AsyncStructuredNode):
     name = StringProperty(unique_index=True)
 
 
-class NodeWithRelationship(AsyncStructuredNode):
-    ...
+class NodeWithRelationship(AsyncStructuredNode): ...
 
 
 class IndexedRelationship(AsyncStructuredRel):
@@ -97,24 +96,33 @@ async def test_install_label_twice(capsys):
         "{code: Neo.ClientError.Schema.EquivalentSchemaRuleAlreadyExists}"
     )
     await adb.install_labels(AbstractNode)
-    await adb.install_labels(AbstractNode)
 
     await adb.install_labels(NodeWithIndex)
-    await adb.install_labels(NodeWithIndex, quiet=False)
-    captured = capsys.readouterr()
-    assert expected_std_out in captured.out
-
     await adb.install_labels(NodeWithConstraint)
-    await adb.install_labels(NodeWithConstraint, quiet=False)
-    captured = capsys.readouterr()
-    assert expected_std_out in captured.out
 
     await adb.install_labels(OtherNodeWithRelationship)
-    await adb.install_labels(OtherNodeWithRelationship, quiet=False)
-    captured = capsys.readouterr()
-    assert expected_std_out in captured.out
 
-    if await adb.version_is_higher_than("5.7"):
+    # Neo4j will throw an error if we try to install the same label twice
+    # Others like Memgraph won't
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        await adb.install_labels(AbstractNode)
+
+        await adb.install_labels(NodeWithIndex, quiet=False)
+        captured = capsys.readouterr()
+        assert expected_std_out in captured.out
+
+        await adb.install_labels(NodeWithConstraint, quiet=False)
+        captured = capsys.readouterr()
+        assert expected_std_out in captured.out
+
+        await adb.install_labels(OtherNodeWithRelationship, quiet=False)
+        captured = capsys.readouterr()
+        assert expected_std_out in captured.out
+
+    if (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        and await adb.version_is_higher_than("5.7")
+    ):
 
         class UniqueIndexRelationship(AsyncStructuredRel):
             unique_index_rel_prop = StringProperty(unique_index=True)
@@ -172,6 +180,8 @@ async def test_relationship_unique_index_not_supported():
 
 @mark_async_test
 async def test_relationship_unique_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.7"):
         pytest.skip("Not supported before 5.7")
 
@@ -203,6 +213,8 @@ async def test_relationship_unique_index():
 
 @mark_async_test
 async def test_fulltext_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -219,6 +231,8 @@ async def test_fulltext_index():
 
 @mark_async_test
 async def test_fulltext_index_conflict():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -256,6 +270,8 @@ async def test_fulltext_index_not_supported():
 
 @mark_async_test
 async def test_rel_fulltext_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -277,6 +293,8 @@ async def test_rel_fulltext_index():
 
 @mark_async_test
 async def test_rel_fulltext_index_conflict():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.16"):
         pytest.skip("Not supported before 5.16")
 
@@ -373,6 +391,8 @@ async def test_vector_index_conflict():
 
 @mark_async_test
 async def test_vector_index_not_supported():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if await adb.version_is_higher_than("5.15"):
         pytest.skip("Test only for versions lower than 5.15")
 
@@ -388,6 +408,8 @@ async def test_vector_index_not_supported():
 
 @mark_async_test
 async def test_rel_vector_index():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.18"):
         pytest.skip("Not supported before 5.18")
 
@@ -412,6 +434,8 @@ async def test_rel_vector_index():
 
 @mark_async_test
 async def test_rel_vector_index_conflict():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only supported for Neo4j")
     if not await adb.version_is_higher_than("5.18"):
         pytest.skip("Not supported before 5.18")
 
@@ -463,6 +487,8 @@ async def test_rel_vector_index_not_supported():
 
 @mark_async_test
 async def test_unauthorized_index_creation():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only tested for Neo4j")
     if not await adb.edition_is_enterprise():
         pytest.skip("Skipping test for community edition")
 
@@ -515,6 +541,8 @@ async def test_unauthorized_index_creation():
 
 @mark_async_test
 async def test_unauthorized_index_creation_recent_features():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("Only tested for Neo4j")
     if not await adb.edition_is_enterprise() or not await adb.version_is_higher_than(
         "5.18"
     ):
@@ -608,14 +636,35 @@ async def test_unauthorized_index_creation_recent_features():
 async def _drop_constraints_for_label_and_property(
     label: str = None, property: str = None
 ):
-    results, meta = await adb.cypher_query("SHOW CONSTRAINTS")
+    query = (
+        "SHOW CONSTRAINT INFO"
+        if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+        else "SHOW CONSTRAINTS"
+    )
+    results, meta = await adb.cypher_query(query)
     results_as_dict = [dict(zip(meta, row)) for row in results]
-    constraint_names = [
-        constraint
-        for constraint in results_as_dict
-        if constraint["labelsOrTypes"] == label and constraint["properties"] == property
-    ]
-    for constraint_name in constraint_names:
-        await adb.cypher_query(f"DROP CONSTRAINT {constraint_name}")
 
-    return constraint_names
+    dropped_constraints = []
+
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        dropped_constraints = [
+            constraint
+            for constraint in results_as_dict
+            if constraint["labelsOrTypes"] == label
+            and constraint["properties"] == property
+        ]
+        for constraint_name in dropped_constraints:
+            await adb.cypher_query(f"DROP CONSTRAINT {constraint_name}")
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        dropped_constraints = [
+            constraint
+            for constraint in results_as_dict
+            if constraint["label"] == label and constraint["properties"][0] == property
+        ]
+        for constraint in dropped_constraints:
+            if constraint["constraint type"] == "exists":
+                query = f"DROP CONSTRAINT ON (n:{constraint['label']}) ASSERT EXISTS (n.{constraint['properties'][0]})"
+            elif constraint["constraint type"] == "unique":
+                query = f"DROP CONSTRAINT ON (n:{constraint['label']}) ASSERT n.{constraint['properties'][0]} IS UNIQUE"
+
+    return dropped_constraints

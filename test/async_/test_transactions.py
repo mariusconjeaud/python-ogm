@@ -5,7 +5,8 @@ from neo4j.api import Bookmarks
 from neo4j.exceptions import ClientError, TransactionError
 from pytest import raises
 
-from neomodel import AsyncStructuredNode, StringProperty, UniqueProperty, adb
+from neomodel import AsyncStructuredNode, StringProperty, UniqueProperty, adb, config
+from neomodel.util import DatabaseFlavour
 
 
 class APerson(AsyncStructuredNode):
@@ -72,6 +73,8 @@ async def test_query_inside_transaction():
 
 @mark_async_test
 async def test_read_transaction():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Memgraph does not support read-only transactions")
     await APerson(name="Johnny").save()
 
     async with adb.read_transaction:
@@ -87,6 +90,8 @@ async def test_read_transaction():
 
 @mark_async_test
 async def test_write_transaction():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Memgraph does not support read-only transactions")
     async with adb.write_transaction:
         await APerson(name="Amelia").save()
 
