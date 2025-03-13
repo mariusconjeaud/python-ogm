@@ -1193,6 +1193,8 @@ def assert_last_query_startswith(mock_func, query) -> bool:
 
 @mark_async_test
 async def test_parallel_runtime(mocker):
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        skip("Only supported for Neo4j.")
     if (
         not await adb.version_is_higher_than("5.13")
         or not await adb.edition_is_enterprise()

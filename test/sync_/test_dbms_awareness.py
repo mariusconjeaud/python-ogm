@@ -2,22 +2,25 @@ from test._async_compat import mark_sync_test
 
 import pytest
 
-from neomodel import db
-from neomodel.util import version_tag_to_integer
+from neomodel import config, db
+from neomodel.util import DatabaseFlavour, version_tag_to_integer
 
 
 @mark_sync_test
 def test_version_awareness():
     db_version = db.database_version
-    if db_version != "5.7.0":
-        pytest.skip("Testing a specific database version")
-    assert db_version == "5.7.0"
-    assert db.version_is_higher_than("5.7")
-    assert db.version_is_higher_than("5.6.0")
-    assert db.version_is_higher_than("5")
-    assert db.version_is_higher_than("4")
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        if db_version != "5.7.0":
+            pytest.skip("Testing a specific database version")
+        assert db_version == "5.7.0"
+        assert db.version_is_higher_than("5.7")
+        assert db.version_is_higher_than("5.6.0")
+        assert db.version_is_higher_than("5")
+        assert db.version_is_higher_than("4")
 
-    assert not db.version_is_higher_than("5.8")
+        assert not db.version_is_higher_than("5.8")
+    else:
+        pytest.skip("Testing a specific database version for Neo4j")
 
 
 @mark_sync_test

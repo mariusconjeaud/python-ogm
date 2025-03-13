@@ -357,8 +357,12 @@ class AsyncDatabase(local):
             results = await self.cypher_query(
                 "CALL dbms.components() yield versions, edition return versions[0], edition"
             )
-            self._database_version = results[0][0][0]
             self._database_edition = results[0][0][1]
+            if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                version_info = await self.cypher_query("SHOW VERSION")
+                self._database_version = version_info[0][0][0]
+            else:
+                self._database_version = results[0][0][0]
         except ServiceUnavailable:
             # The database server is not running yet
             pass
@@ -974,9 +978,12 @@ class AsyncDatabase(local):
         quiet: bool,
     ) -> None:
         label = target_cls.__label__
-        if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH or (
+        if (
             config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
             and await self.version_is_higher_than("5.15")
+        ) or (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            and await self.version_is_higher_than("3.0")
         ):
             index_name = f"vector_index_{label}_{property_name}"
             if not quiet:
@@ -1015,7 +1022,7 @@ class AsyncDatabase(local):
                     raise
         else:
             raise FeatureNotSupported(
-                f"Creation of vector indexes from neomodel is not supported for your database flavour in version {await self.database_version}. Please upgrade to Neo4j 5.15 or higher."
+                f"Creation of vector indexes from neomodel is not supported for your database flavour in version {await self.database_version}. Please upgrade to Neo4j 5.15 / Memgraph 3.0 or higher."
             )
 
     async def _create_node_constraint(

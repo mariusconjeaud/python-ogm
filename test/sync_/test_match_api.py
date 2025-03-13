@@ -1177,6 +1177,8 @@ def assert_last_query_startswith(mock_func, query) -> bool:
 
 @mark_sync_test
 def test_parallel_runtime(mocker):
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        skip("Only supported for Neo4j.")
     if not db.version_is_higher_than("5.13") or not db.edition_is_enterprise():
         skip("Only supported for Enterprise 5.13 and above.")
 

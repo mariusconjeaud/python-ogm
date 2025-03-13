@@ -11,10 +11,16 @@ from neomodel import (
     config,
 )
 from neomodel.sync_.core import db
+from neomodel.util import DatabaseFlavour
 
 
 class ScriptsTestRel(StructuredRel):
-    some_unique_property = StringProperty(unique_index=db.version_is_higher_than("5.7"))
+    some_unique_property = StringProperty(
+        unique_index=(
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and db.version_is_higher_than("5.7")
+        )
+    )
     some_index_property = StringProperty(index=True)
 
 
@@ -49,7 +55,9 @@ def test_neomodel_install_labels():
         for element in constraints
     ]
     assert ("UNIQUENESS", ["ScriptsTestNode"], ["personal_id"]) in parsed_constraints
-    if db.version_is_higher_than("5.7"):
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J and db.version_is_higher_than(
+        "5.7"
+    ):
         assert (
             "RELATIONSHIP_UNIQUENESS",
             ["REL"],
