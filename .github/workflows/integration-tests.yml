@@ -43,6 +43,7 @@ jobs:
         AURA_TEST_DB_USER: ${{ secrets.AURA_TEST_DB_USER }}
         AURA_TEST_DB_PASSWORD: ${{ secrets.AURA_TEST_DB_PASSWORD }}
         AURA_TEST_DB_HOSTNAME: ${{ secrets.AURA_TEST_DB_HOSTNAME }}
+        DATABASE_FLAVOUR: 1
       run: |
         pytest --cov=neomodel --cov-report=html:coverage_report
     - name: Test with pytest for Memgraph
