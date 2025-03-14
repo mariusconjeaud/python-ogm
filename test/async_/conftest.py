@@ -24,6 +24,10 @@ async def setup_neo4j_session(request):
         "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7687"
     )
 
+    config.DATABASE_FLAVOUR = DatabaseFlavour(
+        int(os.environ.get("DATABASE_FLAVOUR", 1))
+    )
+
     # Clear the database if required
     database_is_populated, _ = await adb.cypher_query(
         "MATCH (a) return count(a)>0 as database_is_populated"
