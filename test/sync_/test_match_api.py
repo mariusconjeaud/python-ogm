@@ -2,7 +2,6 @@ import re
 from datetime import datetime
 from test._async_compat import mark_sync_test
 
-import numpy as np
 from pytest import raises, skip, warns
 
 from neomodel import (
@@ -551,11 +550,20 @@ def test_q_filters():
     assert c6 in combined_coffees
     assert c3 not in combined_coffees
 
+    robusta = Species(name="Robusta").save()
+    c4.species.connect(robusta)
+    latte_or_robusta_coffee = (
+        Coffee.nodes.fetch_relations(Optional("species"))
+        .filter(Q(name="Latte") | Q(species__name="Robusta"))
+        .all()
+    )
+    assert len(latte_or_robusta_coffee) == 2
+
     class QQ:
         pass
 
     with raises(TypeError):
-        wrong_Q = Coffee.nodes.filter(Q(price=5) | QQ()).all()
+        Coffee.nodes.filter(Q(price=5) | QQ()).all()
 
 
 def test_qbase():
@@ -626,6 +634,11 @@ def test_relation_prop_filtering():
     nescafe.suppliers.connect(supplier2, {"since": datetime(2010, 4, 1, 0, 0)})
     nescafe.species.connect(arabica)
 
+    result = Coffee.nodes.filter(
+        **{"suppliers|since__gt": datetime(2010, 4, 1, 0, 0)}
+    ).all()
+    assert len(result) == 1
+
     results = Supplier.nodes.filter(
         **{"coffees__name": "Nescafe", "coffees|since__gt": datetime(2018, 4, 1, 0, 0)}
     ).all()
@@ -693,7 +706,7 @@ def test_fetch_relations():
         .fetch_relations(Optional("coffees__suppliers"))
         .all()
     )
-    assert len(result) == 0
+    assert len(result) == 1
 
     if Util.is_async_code:
         count = (
@@ -1143,6 +1156,49 @@ def test_in_filter_with_array_property():
     assert arabica not in Species.nodes.filter(
         tags__in=no_match
     ), "Species found by tags with not match tags given"
+
+
+@mark_sync_test
+def test_unique_variables():
+    arabica = Species(name="Arabica").save()
+    nescafe = Coffee(name="Nescafe", price=99).save()
+    gold3000 = Coffee(name="Gold 3000", price=11).save()
+    supplier1 = Supplier(name="Supplier 1", delivery_cost=3).save()
+    supplier2 = Supplier(name="Supplier 2", delivery_cost=20).save()
+    supplier3 = Supplier(name="Supplier 3", delivery_cost=20).save()
+
+    nescafe.suppliers.connect(supplier1, {"since": datetime(2020, 4, 1, 0, 0)})
+    nescafe.suppliers.connect(supplier2, {"since": datetime(2010, 4, 1, 0, 0)})
+    nescafe.species.connect(arabica)
+    gold3000.suppliers.connect(supplier1, {"since": datetime(2020, 4, 1, 0, 0)})
+    gold3000.species.connect(arabica)
+
+    nodeset = Supplier.nodes.fetch_relations("coffees", "coffees__species").filter(
+        coffees__name="Nescafe"
+    )
+    ast = nodeset.query_cls(nodeset).build_ast()
+    query = ast.build_query()
+    assert "coffee_coffees1" in query
+    assert "coffee_coffees2" in query
+    results = nodeset.all()
+    # This will be 3 because 2 suppliers for Nescafe and 1 for Gold 3000
+    # Gold 3000 is traversed because coffees__species redefines the coffees traversal
+    assert len(results) == 3
+
+    nodeset = (
+        Supplier.nodes.fetch_relations("coffees", "coffees__species")
+        .filter(coffees__name="Nescafe")
+        .unique_variables("coffees")
+    )
+    ast = nodeset.query_cls(nodeset).build_ast()
+    query = ast.build_query()
+    assert "coffee_coffees" in query
+    assert "coffee_coffees1" not in query
+    assert "coffee_coffees2" not in query
+    results = nodeset.all()
+    # This will 2 because Gold 3000 is excluded this time
+    # As coffees will be reused in coffees__species
+    assert len(results) == 2
 
 
 @mark_sync_test
