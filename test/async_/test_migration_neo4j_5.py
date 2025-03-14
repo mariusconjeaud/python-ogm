@@ -9,7 +9,9 @@ from neomodel import (
     IntegerProperty,
     StringProperty,
     adb,
+    config,
 )
+from neomodel.util import DatabaseFlavour
 
 
 class Album(AsyncStructuredNode):
@@ -27,6 +29,8 @@ class Band(AsyncStructuredNode):
 
 @mark_async_test
 async def test_read_elements_id():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("This test is only for Neo4j")
     the_hives = await Band(name="The Hives").save()
     lex_hives = await Album(name="Lex Hives").save()
     released_rel = await the_hives.released.connect(lex_hives)

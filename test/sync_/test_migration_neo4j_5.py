@@ -8,8 +8,10 @@ from neomodel import (
     StringProperty,
     StructuredNode,
     StructuredRel,
+    config,
     db,
 )
+from neomodel.util import DatabaseFlavour
 
 
 class Album(StructuredNode):
@@ -27,6 +29,8 @@ class Band(StructuredNode):
 
 @mark_sync_test
 def test_read_elements_id():
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("This test is only for Neo4j")
     the_hives = Band(name="The Hives").save()
     lex_hives = Album(name="Lex Hives").save()
     released_rel = the_hives.released.connect(lex_hives)

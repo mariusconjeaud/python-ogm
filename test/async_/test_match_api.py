@@ -1032,6 +1032,10 @@ async def test_intermediate_transform():
 @mark_async_test
 async def test_mix_functions():
     # Test with a mix of all advanced querying functions
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        skip(
+            "Memgraph does not support redefining variables from outer scope in subqueries"
+        )
 
     eiffel_tower = await Building(name="Eiffel Tower").save()
     empire_state_building = await Building(name="Empire State Building").save()

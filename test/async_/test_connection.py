@@ -7,6 +7,7 @@ from neo4j import AsyncDriver, AsyncGraphDatabase
 from neo4j.debug import watch
 
 from neomodel import AsyncStructuredNode, StringProperty, adb, config
+from neomodel.util import DatabaseFlavour
 
 
 @mark_async_test
@@ -128,6 +129,8 @@ async def test_wrong_url_format(url):
 @mark_async_test
 @pytest.mark.parametrize("protocol", ["neo4j+s", "neo4j+ssc", "bolt+s", "bolt+ssc"])
 async def test_connect_to_aura(protocol):
+    if config.DATABASE_FLAVOUR != DatabaseFlavour.NEO4J:
+        pytest.skip("This test is only for Neo4j")
     cypher_return = "hello world"
     default_cypher_query = f"RETURN '{cypher_return}'"
     await adb.close_connection()

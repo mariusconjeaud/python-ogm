@@ -1016,6 +1016,10 @@ def test_intermediate_transform():
 @mark_sync_test
 def test_mix_functions():
     # Test with a mix of all advanced querying functions
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        skip(
+            "Memgraph does not support redefining variables from outer scope in subqueries"
+        )
 
     eiffel_tower = Building(name="Eiffel Tower").save()
     empire_state_building = Building(name="Empire State Building").save()
