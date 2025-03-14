@@ -21,10 +21,12 @@ def setup_neo4j_session(request):
     warnings.simplefilter("default")
 
     config.DATABASE_URL = os.environ.get(
-        "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7687"
+        "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7689"
     )
 
-    config.DATABASE_FLAVOUR = os.environ.get("DATABASE_FLAVOUR", DatabaseFlavour.NEO4J)
+    config.DATABASE_FLAVOUR = DatabaseFlavour(
+        int(os.environ.get("DATABASE_FLAVOUR", 1))
+    )
 
     # Clear the database if required
     database_is_populated, _ = db.cypher_query(
