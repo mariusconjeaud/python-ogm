@@ -15,6 +15,7 @@ jobs:
       matrix:
         python-version: ["3.13", "3.12", "3.11", "3.10", "3.9"]
         neo4j-version: ["community", "enterprise", "5.5-enterprise", "4.4-enterprise", "4.4-community"]
+        memgraph-version: ["latest"]
 
     steps:
     - uses: actions/checkout@v3
@@ -28,23 +29,33 @@ jobs:
         chmod +x ./docker-scripts/docker-neo4j.sh
         sh ./docker-scripts/docker-neo4j.sh ${{ matrix.neo4j-version }}
         sleep 30s
+    - name: Creating Memgraph Container
+      run: |
+        chmod +x ./docker-scripts/docker-memgraph.sh
+        sh ./docker-scripts/docker-memgraph.sh ${{ matrix.memgraph-version }}
+        sleep 30s
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e '.[dev,extras]'
-    - name: Test with pytest
+    - name: Test with pytest for Neo4j
       env:
         AURA_TEST_DB_USER: ${{ secrets.AURA_TEST_DB_USER }}
         AURA_TEST_DB_PASSWORD: ${{ secrets.AURA_TEST_DB_PASSWORD }}
         AURA_TEST_DB_HOSTNAME: ${{ secrets.AURA_TEST_DB_HOSTNAME }}
       run: |
         pytest --cov=neomodel --cov-report=html:coverage_report
+    - name: Test with pytest for Memgraph
+      env:
+        DATABASE_FLAVOUR: 2
+      run: |
+        pytest
     - name: Install neo4j-rust-ext and verify it is installed
       run: |
         pip install -e '.[rust-driver-ext]'
         pip list | grep neo4j-rust-ext || exit 1
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}  # Ensure the token is used here
-        fail_ci_if_error: true  # Optional: specify if CI should fail when codecov fails
+    # - name: Upload coverage reports to Codecov
+    #   uses: codecov/codecov-action@v3
+    #   with:
+    #     token: ${{ secrets.CODECOV_TOKEN }}  # Ensure the token is used here
+    #     fail_ci_if_error: true  # Optional: specify if CI should fail when codecov fails
