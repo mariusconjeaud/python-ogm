@@ -21,7 +21,7 @@ async def setup_neo4j_session(request):
     warnings.simplefilter("default")
 
     config.DATABASE_URL = os.environ.get(
-        "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7689"
+        "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7687"
     )
 
     config.DATABASE_FLAVOUR = DatabaseFlavour(

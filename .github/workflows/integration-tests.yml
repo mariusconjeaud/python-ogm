@@ -49,6 +49,7 @@ jobs:
     - name: Test with pytest for Memgraph
       env:
         DATABASE_FLAVOUR: 2
+        NEO4J_BOLT_URL: "bolt://neo4j:foobarbaz@localhost:7689"
       run: |
         pytest
     - name: Install neo4j-rust-ext and verify it is installed
