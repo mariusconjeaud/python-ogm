@@ -4,9 +4,11 @@ import pytest
 
 from neomodel.util import version_tag_to_integer
 
-NEO4J_URL = os.environ.get("NEO4J_URL", "bolt://localhost:7687")
-NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
-NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "foobarbaz")
+DATABASE_USERNAME = os.environ.get("DATABASE_USERNAME", "neo4j")
+DATABASE_PASSWORD = os.environ.get("DATABASE_PASSWORD", "foobarbaz")
+DATABASE_HOSTNAME = os.environ.get("DATABASE_HOSTNAME", "localhost")
+DATABASE_PORT = os.environ.get("DATABASE_PORT", 7687)
+DATABASE_FLAVOUR = int(os.environ.get("DATABASE_FLAVOUR", 1))
 
 
 def pytest_addoption(parser):

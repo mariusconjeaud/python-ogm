@@ -27,4 +27,4 @@ DRIVER = None
 # Use this to connect to a specific database when using the self-managed driver
 DATABASE_NAME = None
 
-DATABASE_FLAVOUR = DatabaseFlavour.MEMGRAPH
+DATABASE_FLAVOUR = DatabaseFlavour.NEO4J

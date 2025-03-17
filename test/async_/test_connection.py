@@ -1,6 +1,11 @@
 import os
 from test._async_compat import mark_async_test
-from test.conftest import NEO4J_PASSWORD, NEO4J_URL, NEO4J_USERNAME
+from test.conftest import (
+    DATABASE_HOSTNAME,
+    DATABASE_PASSWORD,
+    DATABASE_PORT,
+    DATABASE_USERNAME,
+)
 
 import pytest
 from neo4j import AsyncDriver, AsyncGraphDatabase
@@ -8,6 +13,8 @@ from neo4j.debug import watch
 
 from neomodel import AsyncStructuredNode, StringProperty, adb, config
 from neomodel.util import DatabaseFlavour
+
+NEO4J_URL = f"bolt://{DATABASE_HOSTNAME}:{DATABASE_PORT}"
 
 
 @mark_async_test
@@ -53,7 +60,7 @@ async def test_set_connection_driver_works():
     # Test connection using a driver
     await adb.set_connection(
         driver=AsyncGraphDatabase().driver(
-            NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
+            NEO4J_URL, auth=(DATABASE_USERNAME, DATABASE_PASSWORD)
         )
     )
     assert await Pastry(name="Croissant").save()
@@ -67,7 +74,7 @@ async def test_config_driver_works():
 
     # Test connection using a driver defined in config
     driver: AsyncDriver = AsyncGraphDatabase().driver(
-        NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
+        NEO4J_URL, auth=(DATABASE_USERNAME, DATABASE_PASSWORD)
     )
 
     config.DRIVER = driver
@@ -104,7 +111,7 @@ async def test_connect_to_non_default_database():
     # driver init
     await adb.set_connection(
         driver=AsyncGraphDatabase().driver(
-            NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
+            NEO4J_URL, auth=(DATABASE_USERNAME, DATABASE_PASSWORD)
         )
     )
     assert await get_current_database_name() == "pastries"

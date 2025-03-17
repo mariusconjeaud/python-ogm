@@ -7,19 +7,19 @@
 ::
 
     usage: _neomodel_generate_diagram [-h] [--file-type <arrows|puml>] [--write-to-dir <someapp/diagrams> ...]
-    
+
     Connects to a Neo4j database and inspects existing nodes and relationships.
     Infers the schema of the database and generates Python class definitions.
 
-    If a connection URL is not specified, the tool will look up the environment 
-    variable NEO4J_BOLT_URL. If that environment variable is not set, the tool
+    If a connection URL is not specified, the tool will look up the environment
+    variable DATABASE_FULL_URL. If that environment variable is not set, the tool
     will attempt to connect to the default URL bolt://neo4j:neo4j@localhost:7687
 
     If a file is specified, the tool will write the class definitions to that file.
     If no file is specified, the tool will print the class definitions to stdout.
 
     Note : this script only has a synchronous mode.
-    
+
     options:
         -h, --help            show this help message and exit
         -T, --file-type <arrows|puml>
@@ -242,7 +242,7 @@ def main():
             Infers the schema of the database and generates Python class definitions.
 
             If a connection URL is not specified, the tool will look up the environment 
-            variable NEO4J_BOLT_URL. If that environment variable is not set, the tool
+            variable DATABASE_FULL_URL. If that environment variable is not set, the tool
             will attempt to connect to the default URL bolt://neo4j:neo4j@localhost:7687
 
             If a file is specified, the tool will write the class definitions to that file.

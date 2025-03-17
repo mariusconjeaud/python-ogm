@@ -1,6 +1,11 @@
 import os
 from test._async_compat import mark_sync_test
-from test.conftest import NEO4J_PASSWORD, NEO4J_URL, NEO4J_USERNAME
+from test.conftest import (
+    DATABASE_HOSTNAME,
+    DATABASE_PASSWORD,
+    DATABASE_PORT,
+    DATABASE_USERNAME,
+)
 
 import pytest
 from neo4j import Driver, GraphDatabase
@@ -8,6 +13,8 @@ from neo4j.debug import watch
 
 from neomodel import StringProperty, StructuredNode, config, db
 from neomodel.util import DatabaseFlavour
+
+NEO4J_URL = f"bolt://{DATABASE_HOSTNAME}:{DATABASE_PORT}"
 
 
 @mark_sync_test
@@ -52,7 +59,9 @@ def test_set_connection_driver_works():
 
     # Test connection using a driver
     db.set_connection(
-        driver=GraphDatabase().driver(NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
+        driver=GraphDatabase().driver(
+            NEO4J_URL, auth=(DATABASE_USERNAME, DATABASE_PASSWORD)
+        )
     )
     assert Pastry(name="Croissant").save()
 
@@ -65,7 +74,7 @@ def test_config_driver_works():
 
     # Test connection using a driver defined in config
     driver: Driver = GraphDatabase().driver(
-        NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
+        NEO4J_URL, auth=(DATABASE_USERNAME, DATABASE_PASSWORD)
     )
 
     config.DRIVER = driver
@@ -101,7 +110,9 @@ def test_connect_to_non_default_database():
 
     # driver init
     db.set_connection(
-        driver=GraphDatabase().driver(NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
+        driver=GraphDatabase().driver(
+            NEO4J_URL, auth=(DATABASE_USERNAME, DATABASE_PASSWORD)
+        )
     )
     assert get_current_database_name() == "pastries"
 

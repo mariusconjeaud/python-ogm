@@ -4,6 +4,13 @@ from test._async_compat import (
     mark_async_function_auto_fixture,
     mark_sync_session_auto_fixture,
 )
+from test.conftest import (
+    DATABASE_FLAVOUR,
+    DATABASE_HOSTNAME,
+    DATABASE_PASSWORD,
+    DATABASE_PORT,
+    DATABASE_USERNAME,
+)
 
 from neomodel import config, db
 from neomodel.util import DatabaseFlavour
@@ -20,13 +27,9 @@ def setup_neo4j_session(request):
 
     warnings.simplefilter("default")
 
-    config.DATABASE_URL = os.environ.get(
-        "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7687"
-    )
+    config.DATABASE_URL = f"bolt://{DATABASE_USERNAME}:{DATABASE_PASSWORD}@{DATABASE_HOSTNAME}:{DATABASE_PORT}"
 
-    config.DATABASE_FLAVOUR = DatabaseFlavour(
-        int(os.environ.get("DATABASE_FLAVOUR", 1))
-    )
+    config.DATABASE_FLAVOUR = DatabaseFlavour(DATABASE_FLAVOUR)
 
     # Clear the database if required
     database_is_populated, _ = db.cypher_query(

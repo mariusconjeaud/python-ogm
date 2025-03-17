@@ -44,12 +44,19 @@ jobs:
         AURA_TEST_DB_PASSWORD: ${{ secrets.AURA_TEST_DB_PASSWORD }}
         AURA_TEST_DB_HOSTNAME: ${{ secrets.AURA_TEST_DB_HOSTNAME }}
         DATABASE_FLAVOUR: 1
+        DATABASE_USERNAME: neo4j
+        DATABASE_PASSWORD: foobarbaz
+        DATABASE_HOSTNAME: localhost
+        DATABASE_PORT: 7687
       run: |
         pytest --cov=neomodel --cov-report=html:coverage_report
     - name: Test with pytest for Memgraph
       env:
         DATABASE_FLAVOUR: 2
-        NEO4J_BOLT_URL: "bolt://neo4j:foobarbaz@localhost:7689"
+        DATABASE_USERNAME: neo4j
+        DATABASE_PASSWORD: foobarbaz
+        DATABASE_HOSTNAME: localhost
+        DATABASE_PORT: 7689
       run: |
         pytest
     - name: Install neo4j-rust-ext and verify it is installed
