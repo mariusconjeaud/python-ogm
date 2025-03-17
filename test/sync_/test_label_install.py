@@ -396,7 +396,8 @@ def test_vector_index_not_supported():
         pytest.skip("Test only for versions lower than 5.15")
 
     with pytest.raises(
-        FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.15 or higher"
+        FeatureNotSupported,
+        match=r".*Please upgrade to Neo4j 5.15 / Memgraph 3.0 or higher",
     ):
 
         class VectorIndexNodeOld(StructuredNode):
@@ -492,7 +493,7 @@ def test_unauthorized_index_creation():
         pytest.skip("Skipping test for community edition")
 
     unauthorized_user = "troygreene"
-    expected_message_index = r".*Schema operation.* not allowed for user.*"
+    expected_message_index = r".*not allowed for user.*"
 
     # Standard node index
     with pytest.raises(
@@ -546,7 +547,7 @@ def test_unauthorized_index_creation_recent_features():
         pytest.skip("Skipping test for community edition and versions lower than 5.18")
 
     unauthorized_user = "troygreene"
-    expected_message_index = r".*Schema operation.* not allowed for user.*"
+    expected_message_index = r".*not allowed for user.*"
 
     # Node fulltext index
     with pytest.raises(
