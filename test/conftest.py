@@ -7,7 +7,7 @@ from neomodel.util import version_tag_to_integer
 DATABASE_USERNAME = os.environ.get("DATABASE_USERNAME", "neo4j")
 DATABASE_PASSWORD = os.environ.get("DATABASE_PASSWORD", "foobarbaz")
 DATABASE_HOSTNAME = os.environ.get("DATABASE_HOSTNAME", "localhost")
-DATABASE_PORT = os.environ.get("DATABASE_PORT", 7687)
+DATABASE_PORT = os.environ.get("DATABASE_PORT", "7687")
 DATABASE_FLAVOUR = int(os.environ.get("DATABASE_FLAVOUR", 1))
 
 

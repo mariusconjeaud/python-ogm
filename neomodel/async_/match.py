@@ -173,40 +173,38 @@ _REGEX_ENDSWITH = ".*{}"
 
 # regex operations that require escaping
 _STRING_REGEX_OPERATOR_TABLE = {
-    "iexact": (
-        _REGEX_INSENSITIVE
-        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
-        else _REGEX_SENSITIVE
-    ),
     "contains": _REGEX_CONTAINS,
-    "icontains": (
-        _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_CONTAINS
-        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
-        else _REGEX_CONTAINS
-    ),
     "startswith": _REGEX_STARTSWITH,
-    "istartswith": (
-        _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_STARTSWITH
-        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
-        else _REGEX_STARTSWITH
-    ),
     "endswith": _REGEX_ENDSWITH,
-    "iendswith": (
-        _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_ENDSWITH
-        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
-        else _REGEX_ENDSWITH
-    ),
+}
+# Case-insensitive specifics
+_STRING_REGEX_OPERATOR_TABLE_INSENSITIVE = {
+    "iexact": _REGEX_INSENSITIVE,
+    "icontains": _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_CONTAINS,
+    "istartswith": _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_STARTSWITH,
+    "iendswith": _SPECIAL_OPERATOR_INSENSITIVE + _REGEX_ENDSWITH,
+    **_STRING_REGEX_OPERATOR_TABLE,
+}
+# Case-sensitive specifics
+_STRING_REGEX_OPERATOR_TABLE_SENSITIVE = {
+    "iexact": _REGEX_SENSITIVE,
+    "icontains": _REGEX_CONTAINS,
+    "istartswith": _REGEX_STARTSWITH,
+    "iendswith": _REGEX_ENDSWITH,
+    **_STRING_REGEX_OPERATOR_TABLE,
 }
 # regex operations that do not require escaping
-_REGEX_OPERATOR_TABLE = {
-    "iregex": (
-        _REGEX_INSENSITIVE
-        if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
-        else _REGEX_SENSITIVE
-    ),
+# Case-insensitive version
+_REGEX_OPERATOR_TABLE_INSENSITIVE = {
+    "iregex": _REGEX_INSENSITIVE,
+}
+# Case-sensitive version
+_REGEX_OPERATOR_TABLE_SENSITIVE = {
+    "iregex": _REGEX_SENSITIVE,
 }
 # list all regex operations, these will require formatting of the value
-_REGEX_OPERATOR_TABLE.update(_STRING_REGEX_OPERATOR_TABLE)
+_REGEX_OPERATOR_TABLE_INSENSITIVE.update(_STRING_REGEX_OPERATOR_TABLE_INSENSITIVE)
+_REGEX_OPERATOR_TABLE_SENSITIVE.update(_STRING_REGEX_OPERATOR_TABLE_SENSITIVE)
 
 # list all supported operators
 OPERATOR_TABLE = {
@@ -221,7 +219,8 @@ OPERATOR_TABLE = {
     "exact": "=",
 }
 # add all regex operators
-OPERATOR_TABLE.update(_REGEX_OPERATOR_TABLE)
+OPERATOR_TABLE_INSENSITIVE = {**_REGEX_OPERATOR_TABLE_INSENSITIVE, **OPERATOR_TABLE}
+OPERATOR_TABLE_SENSITIVE = {**_REGEX_OPERATOR_TABLE_SENSITIVE, **OPERATOR_TABLE}
 
 path_split_regex = re.compile(r"__(?!_)|\|")
 
@@ -264,11 +263,23 @@ def _handle_special_operators(
             raise ValueError(f"Value must be a bool for isnull operation on {key}")
         operator = "IS NULL" if value else "IS NOT NULL"
         deflated_value = None
-    elif operator in _REGEX_OPERATOR_TABLE.values():
+    elif (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        and operator in _REGEX_OPERATOR_TABLE_INSENSITIVE.values()
+    ) or (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+        and operator in _REGEX_OPERATOR_TABLE_SENSITIVE.values()
+    ):
         deflated_value = property_obj.deflate(value)
         if not isinstance(deflated_value, str):
             raise ValueError(f"Must be a string value for {key}")
-        if operator in _STRING_REGEX_OPERATOR_TABLE.values():
+        if (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and operator in _STRING_REGEX_OPERATOR_TABLE_INSENSITIVE.values()
+        ) or (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            and operator in _STRING_REGEX_OPERATOR_TABLE_SENSITIVE.values()
+        ):
             deflated_value = re.escape(deflated_value)
         deflated_value = operator.format(deflated_value)
         operator = _SPECIAL_OPERATOR_REGEX
@@ -343,8 +354,18 @@ def _process_filter_key(
                 defined_props[part].lookup_node_class()
                 current_class = defined_props[part].definition["node_class"]
                 current_rel_model = defined_props[part].definition["model"]
-        elif part in OPERATOR_TABLE:
-            operator = OPERATOR_TABLE[part]
+        elif (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+            and part in OPERATOR_TABLE_INSENSITIVE
+        ) or (
+            config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+            and part in OPERATOR_TABLE_SENSITIVE
+        ):
+            operator = (
+                OPERATOR_TABLE_SENSITIVE[part]
+                if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+                else OPERATOR_TABLE_INSENSITIVE[part]
+            )
             prop, _ = prop.rsplit("__", 1)
             continue
         else:

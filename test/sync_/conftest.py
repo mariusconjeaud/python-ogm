@@ -44,18 +44,23 @@ def setup_neo4j_session(request):
 
     db.install_all_labels()
 
+    db_edition = db.database_edition
     if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
         db.cypher_query(
             "CREATE OR REPLACE USER troygreene SET PASSWORD 'foobarbaz' CHANGE NOT REQUIRED"
         )
-    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+    # Note : Memgraph Community does not support multiple users
+    elif (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+        and db_edition == "enterprise"
+    ):
         db.cypher_query(
             "CREATE USER IF NOT EXISTS troygreene IDENTIFIED BY 'foobarbaz'"
         )
-    # db_edition = await adb.database_edition
-    # if db_edition == "enterprise":
-    #     await adb.cypher_query("GRANT ROLE publisher TO troygreene")
-    #     await adb.cypher_query("GRANT IMPERSONATE (troygreene) ON DBMS TO admin")
+
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J and db_edition == "enterprise":
+        db.cypher_query("GRANT ROLE publisher TO troygreene")
+        db.cypher_query("GRANT IMPERSONATE (troygreene) ON DBMS TO admin")
 
     yield
 
