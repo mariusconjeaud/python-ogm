@@ -32,6 +32,8 @@ class ScriptsTestNode(StructuredNode):
 
 
 def test_neomodel_install_labels():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Only tested for Neo4j")
     result = subprocess.run(
         ["neomodel_install_labels", "--help"],
         capture_output=True,
@@ -72,6 +74,8 @@ def test_neomodel_install_labels():
 
 
 def test_neomodel_remove_labels():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Only tested for Neo4j")
     result = subprocess.run(
         ["neomodel_remove_labels", "--help"],
         capture_output=True,
@@ -105,6 +109,8 @@ def test_neomodel_remove_labels():
     ],
 )
 def test_neomodel_inspect_database(script_flavour):
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Only tested for Neo4j")
     output_file = "test/data/neomodel_inspect_database_test_output.py"
     # Check that the help option works
     result = subprocess.run(
@@ -216,6 +222,8 @@ def test_neomodel_inspect_database(script_flavour):
 
 
 def test_neomodel_generate_diagram():
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        pytest.skip("Only tested for Neo4j")
     result = subprocess.run(
         ["neomodel_generate_diagram", "--help"],
         capture_output=True,
