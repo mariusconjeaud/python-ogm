@@ -1,4 +1,3 @@
-import os
 import warnings
 from test._async_compat import (
     mark_async_function_auto_fixture,
@@ -30,6 +29,8 @@ async def setup_neo4j_session(request):
     config.DATABASE_URL = f"bolt://{DATABASE_USERNAME}:{DATABASE_PASSWORD}@{DATABASE_HOSTNAME}:{DATABASE_PORT}"
 
     config.DATABASE_FLAVOUR = DatabaseFlavour(DATABASE_FLAVOUR)
+
+    adb.set_connection(config.DATABASE_URL)
 
     # Clear the database if required
     database_is_populated, _ = await adb.cypher_query(
