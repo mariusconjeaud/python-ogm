@@ -1254,7 +1254,7 @@ class AsyncDatabase(local):
                 elif property.unique_index:
                     if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
                         warnings.warn(
-                            "Relationship property uniqueness constraint is not available in Memgraph. "
+                            "Relationship property uniqueness constraint is not supported in Memgraph. "
                             "Reverting to basic index creation.",
                             UserWarning,
                         )

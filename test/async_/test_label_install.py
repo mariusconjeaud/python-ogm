@@ -31,7 +31,7 @@ class NodeWithConstraint(AsyncStructuredNode):
 
 
 class NodeWithRelationship(AsyncStructuredNode):
-    ...
+    pass
 
 
 class IndexedRelationship(AsyncStructuredRel):
@@ -156,8 +156,11 @@ async def test_install_labels_db_property(capsys):
 
 @mark_async_test
 async def test_relationship_unique_index_not_supported():
-    if await adb.version_is_higher_than("5.7"):
-        pytest.skip("Not supported before 5.7")
+    if (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        and await adb.version_is_higher_than("5.7")
+    ):
+        pytest.skip("Not supported for Neo4j before 5.7")
 
     class UniqueIndexRelationship(AsyncStructuredRel):
         name = StringProperty(unique_index=True)
@@ -165,18 +168,33 @@ async def test_relationship_unique_index_not_supported():
     class TargetNodeForUniqueIndexRelationship(AsyncStructuredNode):
         pass
 
-    with pytest.raises(
-        FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.7 or higher"
-    ):
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        with pytest.raises(
+            FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.7 or higher"
+        ):
 
-        class NodeWithUniqueIndexRelationship(AsyncStructuredNode):
-            has_rel = AsyncRelationshipTo(
-                TargetNodeForUniqueIndexRelationship,
-                "UNIQUE_INDEX_REL",
-                model=UniqueIndexRelationship,
-            )
+            class NodeWithUniqueIndexRelationship(AsyncStructuredNode):
+                has_rel = AsyncRelationshipTo(
+                    TargetNodeForUniqueIndexRelationship,
+                    "UNIQUE_INDEX_REL",
+                    model=UniqueIndexRelationship,
+                )
 
-        await adb.install_labels(NodeWithUniqueIndexRelationship)
+            await adb.install_labels(NodeWithUniqueIndexRelationship)
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        # Capture warnings and validate content
+        with pytest.warns(
+            UserWarning, match=r".*not supported.*Reverting to basic index.*"
+        ):
+
+            class NodeWithUniqueIndexRelationship(AsyncStructuredNode):
+                has_rel = AsyncRelationshipTo(
+                    TargetNodeForUniqueIndexRelationship,
+                    "UNIQUE_INDEX_REL",
+                    model=UniqueIndexRelationship,
+                )
+
+            await adb.install_labels(NodeWithUniqueIndexRelationship)
 
 
 @mark_async_test
