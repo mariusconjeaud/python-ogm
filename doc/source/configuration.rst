@@ -97,15 +97,15 @@ too.
 
 These are:
 
-* ``NEO4J_USERNAME``
-* ``NEO4J_PASSWORD``
-* ``NEO4J_BOLT_URL``
+* ``DATABASE_USERNAME``
+* ``DATABASE_PASSWORD``
+* ``DATABASE_FULL_URL``
 
 By setting these with (for example): ::
 
-    $ export NEO4J_USERNAME=neo4j
-    $ export NEO4J_PASSWORD=neo4j
-    $ export NEO4J_BOLT_URL="bolt://$NEO4J_USERNAME:$NEO4J_PASSWORD@localhost:7687"
+    $ export DATABASE_USERNAME=neo4j
+    $ export DATABASE_PASSWORD=neo4j
+    $ export DATABASE_FULL_URL="bolt://$DATABASE_USERNAME:$DATABASE_PASSWORD@localhost:7687"
 
 They can be accessed from a Python script via the ``environ`` dict of module ``os`` and be used to set the connection
 with something like: ::
@@ -113,7 +113,7 @@ with something like: ::
     import os
     from neomodel import config
 
-    config.DATABASE_URL = os.environ["NEO4J_BOLT_URL"]
+    config.DATABASE_URL = os.environ["DATABASE_FULL_URL"]
 
 
 Enable automatic index and constraint creation

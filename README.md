@@ -102,7 +102,7 @@ issues too.
 Make sure you have a Neo4j database version 4 or higher to run the tests
 on.:
 
-    $ export NEO4J_BOLT_URL=bolt://<username>:<password>@localhost:7687 # check your username and password
+    $ export DATABASE_FULL_URL=bolt://<username>:<password>@localhost:7687 # check your username and password
 
 Ensure `dbms.security.auth_enabled=true` in your database configuration
 file. Setup a virtual environment, install neomodel for development and

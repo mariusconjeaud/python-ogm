@@ -33,7 +33,7 @@ script (:ref:`neomodel_install_labels`) to automate this: ::
 
 It is important to execute this after altering the schema and observe the number of classes it reports.
 
-Ommitting the ``--db`` argument will default to the ``NEO4J_BOLT_URL`` environment variable. This is useful for masking
+Ommitting the ``--db`` argument will default to the ``DATABASE_FULL_URL`` environment variable. This is useful for masking
 your credentials.
 
 .. note::

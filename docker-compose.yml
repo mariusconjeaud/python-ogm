@@ -18,7 +18,7 @@ services:
     depends_on:
       - neo4j
     environment:
-      NEO4J_BOLT_URL: bolt://neo4j:foobarbaz@neo4j:7687
+      DATABASE_FULL_URL: bolt://neo4j:foobarbaz@neo4j:7687
       NEO4J_VERSION: ${NEO4J_VERSION}
 
   neo4j:

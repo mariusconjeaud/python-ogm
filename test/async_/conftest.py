@@ -1,8 +1,14 @@
-import os
 import warnings
 from test._async_compat import (
     mark_async_function_auto_fixture,
     mark_async_session_auto_fixture,
+)
+from test.conftest import (
+    DATABASE_FLAVOUR,
+    DATABASE_HOSTNAME,
+    DATABASE_PASSWORD,
+    DATABASE_PORT,
+    DATABASE_USERNAME,
 )
 
 from neomodel import adb, config
@@ -20,9 +26,11 @@ async def setup_neo4j_session(request):
 
     warnings.simplefilter("default")
 
-    config.DATABASE_URL = os.environ.get(
-        "NEO4J_BOLT_URL", "bolt://neo4j:foobarbaz@localhost:7687"
-    )
+    config.DATABASE_URL = f"bolt://{DATABASE_USERNAME}:{DATABASE_PASSWORD}@{DATABASE_HOSTNAME}:{DATABASE_PORT}"
+
+    config.DATABASE_FLAVOUR = DatabaseFlavour(DATABASE_FLAVOUR)
+
+    adb.set_connection(config.DATABASE_URL)
 
     # Clear the database if required
     database_is_populated, _ = await adb.cypher_query(
@@ -37,18 +45,23 @@ async def setup_neo4j_session(request):
 
     await adb.install_all_labels()
 
+    db_edition = await adb.database_edition
     if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
         await adb.cypher_query(
             "CREATE OR REPLACE USER troygreene SET PASSWORD 'foobarbaz' CHANGE NOT REQUIRED"
         )
-    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+    # Note : Memgraph Community does not support multiple users
+    elif (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+        and db_edition == "enterprise"
+    ):
         await adb.cypher_query(
             "CREATE USER IF NOT EXISTS troygreene IDENTIFIED BY 'foobarbaz'"
         )
-    # db_edition = await adb.database_edition
-    # if db_edition == "enterprise":
-    #     await adb.cypher_query("GRANT ROLE publisher TO troygreene")
-    #     await adb.cypher_query("GRANT IMPERSONATE (troygreene) ON DBMS TO admin")
+
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J and db_edition == "enterprise":
+        await adb.cypher_query("GRANT ROLE publisher TO troygreene")
+        await adb.cypher_query("GRANT IMPERSONATE (troygreene) ON DBMS TO admin")
 
     yield
 

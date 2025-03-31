@@ -30,7 +30,8 @@ class NodeWithConstraint(StructuredNode):
     name = StringProperty(unique_index=True)
 
 
-class NodeWithRelationship(StructuredNode): ...
+class NodeWithRelationship(StructuredNode):
+    pass
 
 
 class IndexedRelationship(StructuredRel):
@@ -154,8 +155,10 @@ def test_install_labels_db_property(capsys):
 
 @mark_sync_test
 def test_relationship_unique_index_not_supported():
-    if db.version_is_higher_than("5.7"):
-        pytest.skip("Not supported before 5.7")
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J and db.version_is_higher_than(
+        "5.7"
+    ):
+        pytest.skip("Not supported for Neo4j before 5.7")
 
     class UniqueIndexRelationship(StructuredRel):
         name = StringProperty(unique_index=True)
@@ -163,18 +166,33 @@ def test_relationship_unique_index_not_supported():
     class TargetNodeForUniqueIndexRelationship(StructuredNode):
         pass
 
-    with pytest.raises(
-        FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.7 or higher"
-    ):
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        with pytest.raises(
+            FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.7 or higher"
+        ):
 
-        class NodeWithUniqueIndexRelationship(StructuredNode):
-            has_rel = RelationshipTo(
-                TargetNodeForUniqueIndexRelationship,
-                "UNIQUE_INDEX_REL",
-                model=UniqueIndexRelationship,
-            )
+            class NodeWithUniqueIndexRelationship(StructuredNode):
+                has_rel = RelationshipTo(
+                    TargetNodeForUniqueIndexRelationship,
+                    "UNIQUE_INDEX_REL",
+                    model=UniqueIndexRelationship,
+                )
 
-        db.install_labels(NodeWithUniqueIndexRelationship)
+            db.install_labels(NodeWithUniqueIndexRelationship)
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        # Capture warnings and validate content
+        with pytest.warns(
+            UserWarning, match=r".*not supported.*Reverting to basic index.*"
+        ):
+
+            class NodeWithUniqueIndexRelationship(StructuredNode):
+                has_rel = RelationshipTo(
+                    TargetNodeForUniqueIndexRelationship,
+                    "UNIQUE_INDEX_REL",
+                    model=UniqueIndexRelationship,
+                )
+
+            db.install_labels(NodeWithUniqueIndexRelationship)
 
 
 @mark_sync_test
@@ -396,7 +414,8 @@ def test_vector_index_not_supported():
         pytest.skip("Test only for versions lower than 5.15")
 
     with pytest.raises(
-        FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.15 or higher"
+        FeatureNotSupported,
+        match=r".*Please upgrade to Neo4j 5.15 / Memgraph 3.0 or higher",
     ):
 
         class VectorIndexNodeOld(StructuredNode):
@@ -492,7 +511,7 @@ def test_unauthorized_index_creation():
         pytest.skip("Skipping test for community edition")
 
     unauthorized_user = "troygreene"
-    expected_message_index = r".*Schema operation.* not allowed for user.*"
+    expected_message_index = r".*not allowed for user.*"
 
     # Standard node index
     with pytest.raises(
@@ -546,7 +565,7 @@ def test_unauthorized_index_creation_recent_features():
         pytest.skip("Skipping test for community edition and versions lower than 5.18")
 
     unauthorized_user = "troygreene"
-    expected_message_index = r".*Schema operation.* not allowed for user.*"
+    expected_message_index = r".*not allowed for user.*"
 
     # Node fulltext index
     with pytest.raises(

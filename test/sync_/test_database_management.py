@@ -1,4 +1,10 @@
 from test._async_compat import mark_sync_test
+from test.conftest import (
+    DATABASE_HOSTNAME,
+    DATABASE_PASSWORD,
+    DATABASE_PORT,
+    DATABASE_USERNAME,
+)
 
 import pytest
 from neo4j.exceptions import AuthError, ClientError
@@ -60,10 +66,17 @@ def test_clear_database():
 
 @mark_sync_test
 def test_change_password():
-    prev_password = "foobarbaz"
+    if (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH
+        and not db.edition_is_enterprise()
+    ):
+        pytest.skip("This test is not supported on Memgraph Community")
+    prev_password = DATABASE_PASSWORD
     new_password = "newpassword"
-    prev_url = f"bolt://neo4j:{prev_password}@localhost:7687"
-    new_url = f"bolt://neo4j:{new_password}@localhost:7687"
+    prev_url = f"bolt://{DATABASE_USERNAME}:{prev_password}@{DATABASE_HOSTNAME}:{DATABASE_PORT}"
+    new_url = (
+        f"bolt://{DATABASE_USERNAME}:{new_password}@{DATABASE_HOSTNAME}:{DATABASE_PORT}"
+    )
 
     db.change_neo4j_password("neo4j", new_password)
     db.close_connection()

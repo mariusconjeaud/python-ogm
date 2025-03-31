@@ -30,7 +30,8 @@ class NodeWithConstraint(AsyncStructuredNode):
     name = StringProperty(unique_index=True)
 
 
-class NodeWithRelationship(AsyncStructuredNode): ...
+class NodeWithRelationship(AsyncStructuredNode):
+    pass
 
 
 class IndexedRelationship(AsyncStructuredRel):
@@ -155,8 +156,11 @@ async def test_install_labels_db_property(capsys):
 
 @mark_async_test
 async def test_relationship_unique_index_not_supported():
-    if await adb.version_is_higher_than("5.7"):
-        pytest.skip("Not supported before 5.7")
+    if (
+        config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J
+        and await adb.version_is_higher_than("5.7")
+    ):
+        pytest.skip("Not supported for Neo4j before 5.7")
 
     class UniqueIndexRelationship(AsyncStructuredRel):
         name = StringProperty(unique_index=True)
@@ -164,18 +168,33 @@ async def test_relationship_unique_index_not_supported():
     class TargetNodeForUniqueIndexRelationship(AsyncStructuredNode):
         pass
 
-    with pytest.raises(
-        FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.7 or higher"
-    ):
+    if config.DATABASE_FLAVOUR == DatabaseFlavour.NEO4J:
+        with pytest.raises(
+            FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.7 or higher"
+        ):
 
-        class NodeWithUniqueIndexRelationship(AsyncStructuredNode):
-            has_rel = AsyncRelationshipTo(
-                TargetNodeForUniqueIndexRelationship,
-                "UNIQUE_INDEX_REL",
-                model=UniqueIndexRelationship,
-            )
+            class NodeWithUniqueIndexRelationship(AsyncStructuredNode):
+                has_rel = AsyncRelationshipTo(
+                    TargetNodeForUniqueIndexRelationship,
+                    "UNIQUE_INDEX_REL",
+                    model=UniqueIndexRelationship,
+                )
 
-        await adb.install_labels(NodeWithUniqueIndexRelationship)
+            await adb.install_labels(NodeWithUniqueIndexRelationship)
+    elif config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+        # Capture warnings and validate content
+        with pytest.warns(
+            UserWarning, match=r".*not supported.*Reverting to basic index.*"
+        ):
+
+            class NodeWithUniqueIndexRelationship(AsyncStructuredNode):
+                has_rel = AsyncRelationshipTo(
+                    TargetNodeForUniqueIndexRelationship,
+                    "UNIQUE_INDEX_REL",
+                    model=UniqueIndexRelationship,
+                )
+
+            await adb.install_labels(NodeWithUniqueIndexRelationship)
 
 
 @mark_async_test
@@ -397,7 +416,8 @@ async def test_vector_index_not_supported():
         pytest.skip("Test only for versions lower than 5.15")
 
     with pytest.raises(
-        FeatureNotSupported, match=r".*Please upgrade to Neo4j 5.15 or higher"
+        FeatureNotSupported,
+        match=r".*Please upgrade to Neo4j 5.15 / Memgraph 3.0 or higher",
     ):
 
         class VectorIndexNodeOld(AsyncStructuredNode):
@@ -493,7 +513,7 @@ async def test_unauthorized_index_creation():
         pytest.skip("Skipping test for community edition")
 
     unauthorized_user = "troygreene"
-    expected_message_index = r".*Schema operation.* not allowed for user.*"
+    expected_message_index = r".*not allowed for user.*"
 
     # Standard node index
     with pytest.raises(
@@ -549,7 +569,7 @@ async def test_unauthorized_index_creation_recent_features():
         pytest.skip("Skipping test for community edition and versions lower than 5.18")
 
     unauthorized_user = "troygreene"
-    expected_message_index = r".*Schema operation.* not allowed for user.*"
+    expected_message_index = r".*not allowed for user.*"
 
     # Node fulltext index
     with pytest.raises(

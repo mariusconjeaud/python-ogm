@@ -355,7 +355,7 @@ class Database(local):
         """
         try:
             results = self.cypher_query(
-                "CALL dbms.components() yield versions, edition return versions[0], edition"
+                "CALL dbms.components() yield versions, edition, name return versions[0], edition, name"
             )
             self._database_edition = results[0][0][1]
             if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
@@ -1250,14 +1250,29 @@ class Database(local):
                         quiet=quiet,
                     )
                 elif property.unique_index:
-                    self._create_relationship_constraint(
-                        relationship_type=relationship_type,
-                        target_cls=cls,
-                        relationship_cls=relationship_cls,
-                        property_name=db_property,
-                        stdout=stdout,
-                        quiet=quiet,
-                    )
+                    if config.DATABASE_FLAVOUR == DatabaseFlavour.MEMGRAPH:
+                        warnings.warn(
+                            "Relationship property uniqueness constraint is not supported in Memgraph. "
+                            "Reverting to basic index creation.",
+                            UserWarning,
+                        )
+                        self._create_relationship_index(
+                            relationship_type=relationship_type,
+                            target_cls=cls,
+                            relationship_cls=relationship_cls,
+                            property_name=db_property,
+                            stdout=stdout,
+                            quiet=quiet,
+                        )
+                    else:
+                        self._create_relationship_constraint(
+                            relationship_type=relationship_type,
+                            target_cls=cls,
+                            relationship_cls=relationship_cls,
+                            property_name=db_property,
+                            stdout=stdout,
+                            quiet=quiet,
+                        )
 
                 if property.fulltext_index:
                     self._create_relationship_fulltext_index(

@@ -84,7 +84,7 @@ You can inspect an existing Neo4j database to generate a neomodel definition fil
 This will generate a file called ``models.py`` in the ``yourapp`` directory. This file can be used as a starting point,
 and will contain the necessary module imports, as well as class definition for nodes and, if relevant, relationships.
 
-Ommitting the ``--db`` argument will default to the ``NEO4J_BOLT_URL`` environment variable. This is useful for masking
+Ommitting the ``--db`` argument will default to the ``DATABASE_FULL_URL`` environment variable. This is useful for masking
 your credentials.
 
 Note that you can also print the output to the console instead of writing a file by omitting the ``--write-to`` option.
@@ -121,7 +121,7 @@ script (:ref:`neomodel_install_labels`) to automate this: ::
 
 It is important to execute this after altering the schema and observe the number of classes it reports.
 
-Ommitting the ``--db`` argument will default to the ``NEO4J_BOLT_URL`` environment variable. This is useful for masking
+Ommitting the ``--db`` argument will default to the ``DATABASE_FULL_URL`` environment variable. This is useful for masking
 your credentials.
 
 Remove existing constraints and indexes
@@ -133,7 +133,7 @@ the database, when this is required: ::
 
 After executing, it will print all indexes and constraints it has removed.
 
-Ommitting the ``--db`` argument will default to the ``NEO4J_BOLT_URL`` environment variable. This is useful for masking
+Ommitting the ``--db`` argument will default to the ``DATABASE_FULL_URL`` environment variable. This is useful for masking
 your credentials.
 
 Generate class diagram
